@@ -105,6 +105,7 @@ if __name__ == "__main__":
     headers = load_headers('./data/contributions-from-committees/con-from-com-header.csv')
     # Define the data files and their corresponding years
     data_files = [
+        ('./data/contributions-from-committees/con-from-com-19-20.txt', 2019),
         ('./data/contributions-from-committees/con-from-com-21-22.txt', 2021),
         ('./data/contributions-from-committees/con-from-com-23-24.txt', 2023),
         ('./data/contributions-from-committees/con-from-com-25-26.txt', 2025)

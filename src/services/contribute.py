@@ -99,7 +99,7 @@ def query_contributors_by_industry(candidate_id):
 
 if __name__ == "__main__":
     # Example usage
-    candidate_id = search_candidate('Ted Cruz')
+    candidate_id = search_candidate('Thomas Cotton')
     if candidate_id:
         print(f"\nDetailed contribution analysis for {candidate_id}:")
         query_contributors_by_industry(candidate_id)

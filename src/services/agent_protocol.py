@@ -322,7 +322,7 @@ Keep the tone professional and factual, focusing only on verifiable data."""
 # Example usage
 async def main():
     protocol = MCPProtocol()
-    response = await protocol.process_query("Analyze the campaign contributions for Ted Cruz")
+    response = await protocol.process_query("Analyze the campaign contributions for Tom Cotton")
     print(json.dumps(response, indent=2))
 
 if __name__ == "__main__":
