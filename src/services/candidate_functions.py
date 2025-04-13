@@ -30,7 +30,6 @@ def search_candidate(name, auto_select_first=False):
         "per_page": 5,
         "sort": "-election_years"  # Sort by most recent election year
     }
-    
     try:
         response = httpx.get(url, params=params)
         response.raise_for_status()
@@ -85,3 +84,40 @@ def search_candidate(name, auto_select_first=False):
     except Exception as e:
         print(f"Unexpected error: {e}")
         return None
+
+def candidate_info(candidate_id):
+    """
+    Get detailed information about a candidate given their FEC candidate ID.
+
+    Args:
+        candidate_id (str): The FEC ID of the candidate.
+
+    Returns:
+        dict: A dictionary of candidate details.
+    """
+    url = f"{BASE_URL}/candidate/{candidate_id}/"
+
+    params = {
+        "api_key": API_KEY
+    }
+
+    response = httpx.get(url, params=params)
+    if response.status_code != 200:
+        raise ValueError(f"Failed to fetch candidate info: {response.text}")
+
+    data = response.json()
+
+    if not data["results"]:
+        return None
+
+    result = data["results"][0]
+    return {
+        "name": result.get("name"),
+        "party": result.get("party_full", "N/A"),
+        "office": result.get("office_full", "N/A"),
+        "state": result.get("state", "N/A"),
+        "status": result.get("candidate_status", "N/A"),
+        "first_election_year": result.get("first_election_year", "N/A"),
+        "last_election_year": result.get("election_years", [])[-1] if result.get("election_years") else "N/A",
+    }
+

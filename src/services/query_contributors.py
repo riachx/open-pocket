@@ -1,4 +1,4 @@
-from candidate_functions import search_candidate
+from candidate_functions import search_candidate, candidate_info
 import sqlite3
 
 def get_db_connection():
@@ -80,9 +80,28 @@ if __name__ == "__main__":
     # Example usage
     candidate_id = search_candidate('Donald Trump')
     
-    # Query all contributions
-    print("\nAll contributions:")
-    query_contributors(candidate_id)
+    if candidate_id:
+        # Get detailed candidate info
+        info = candidate_info(candidate_id)
+        
+        # Print detailed information
+        print("\nDetailed Candidate Information:")
+        print(f"Name: {info['name']}")
+        print(f"Party: {info['party']}")
+        print(f"Office: {info['office']}")
+        print(f"State: {info['state']}")
+        print(f"Status: {info['status']}")
+        print(f"First Election Year: {info['first_election_year']}")
+        print(f"Most Recent Election Year: {info['last_election_year']}")
+        
+        # Query contributions if you want to see them as well
+        print("\nContribution Information:")
+        query_contributors(candidate_id)
+    else:
+        print(f"No candidate found with id: {candidate_id}")
+    
+    
+
     
     # Query contributions for a specific year
     #print("\nContributions for 2023:")

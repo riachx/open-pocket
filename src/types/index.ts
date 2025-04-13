@@ -11,3 +11,12 @@ export interface Politician {
     email: string;
     
   }
+
+  export interface Senator {
+    id: number;
+    name: string;
+    party: string;
+    state: string;
+    photoUrl?: string;
+    phones?: string[];
+  }

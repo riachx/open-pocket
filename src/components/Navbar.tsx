@@ -14,14 +14,14 @@ const Navbar = () => {
             fontWeight="bold"
             _hover={{ textDecoration: 'none' }}
           >
-            Govtruth.io
+            OpenSecrets
           </ChakraLink>
 
           <HStack spacing={8}>
             <ChakraLink as={Link} to="/about">
               About
             </ChakraLink>
-            <ChakraLink as={Link} to="/profiles">
+            <ChakraLink as={Link} to="/profile">
               Profiles
             </ChakraLink>
             <ChakraLink as={Link} to="/explore">
