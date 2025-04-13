@@ -5,6 +5,7 @@ import {
   Input, InputGroup, InputLeftElement, Button, Heading, Flex
 } from '@chakra-ui/react';
 import { SearchIcon } from '@chakra-ui/icons';
+import { Link } from 'react-router-dom';
 
 interface Senator {
   id: number;
@@ -34,7 +35,7 @@ const Profile = () => {
         }
         
         const data = await response.json();
-        console.log('Received data:', data);
+        console.log('Received senators data:', data);
         setSenators(data);
       } catch (err) {
         console.error('Error fetching senators:', err);
@@ -144,32 +145,42 @@ const Profile = () => {
       <Box bg="gray.100" mx={4} borderRadius="40" p={6}>
         <SimpleGrid columns={{ base: 4, md: 6, lg: 8 }} spacing={4}>
           {filteredSenators.map((senator) => (
-            <Box
+            <Link 
+              to={`/politician/${senator.id}`} 
               key={senator.id}
-              borderRadius="2xl"
-              overflow="hidden"
-              boxShadow="md"
-              bg="white"
-              p={3}
-              mx="auto"
+              style={{ textDecoration: 'none' }}
             >
-              <VStack>
-                <Image
-                  src={senator.photoUrl || "https://i.imgur.com/VlKTQWO.png"}
-                  alt={senator.name}
-                  borderRadius="2xl"
-                  boxSize="100px"
-                  objectFit="cover"
-                  fallbackSrc="https://i.imgur.com/VlKTQWO.png"
-                />
-                <Text fontWeight="bold" textAlign="center" fontSize="sm">
-                  {senator.name}
-                </Text>
-                <Text fontSize="xs" color="gray.600">
-                  {senator.party} - {senator.state}
-                </Text>
-              </VStack>
-            </Box>
+              <Box
+                borderRadius="2xl"
+                overflow="hidden"
+                boxShadow="md"
+                bg="white"
+                p={3}
+                mx="auto"
+                transition="transform 0.2s"
+                _hover={{
+                  transform: 'scale(1.02)',
+                  boxShadow: 'lg',
+                }}
+              >
+                <VStack>
+                  <Image
+                    src={senator.photoUrl || "https://i.imgur.com/VlKTQWO.png"}
+                    alt={senator.name}
+                    borderRadius="2xl"
+                    boxSize="100px"
+                    objectFit="cover"
+                    fallbackSrc="https://i.imgur.com/VlKTQWO.png"
+                  />
+                  <Text fontWeight="bold" textAlign="center" fontSize="sm">
+                    {senator.name}
+                  </Text>
+                  <Text fontSize="xs" color="gray.600">
+                    {senator.party} - {senator.state}
+                  </Text>
+                </VStack>
+              </Box>
+            </Link>
           ))}
         </SimpleGrid>
       </Box>

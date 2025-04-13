@@ -94,13 +94,13 @@ if __name__ == "__main__":
     conn = init_db()
     
     # Load data into database (only need to do this once)
-    headers = load_headers('../assets/data/contributions-from-committees/con-from-com-header.csv')
+    headers = load_headers('./data/contributions-from-committees/con-from-com-header.csv')
     
     # Define the data files and their corresponding years
     data_files = [
-        ('../assets/data/contributions-from-committees/con-from-com-21-22.txt', 2021),
-        ('../assets/data/contributions-from-committees/con-from-com-23-24.txt', 2023),
-        ('../assets/data/contributions-from-committees/con-from-com-25-26.txt', 2025)
+        ('./data/contributions-from-committees/con-from-com-21-22.txt', 2021),
+        ('./data/contributions-from-committees/con-from-com-23-24.txt', 2023),
+        ('./data/contributions-from-committees/con-from-com-25-26.txt', 2025)
     ]
     
     # Load each file with its corresponding year
