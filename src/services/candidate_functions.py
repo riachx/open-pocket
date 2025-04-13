@@ -11,9 +11,13 @@ if not API_KEY:
     raise ValueError("OPENFEC_API_KEY is not set. Make sure it's in your .env file.")
 
 
-def search_candidate(name):
+def search_candidate(name, auto_select_first=False):
     """
-    Search for a candidate with a specific name and let user choose if multiple matches found
+    Search for a candidate with a specific name
+    
+    Args:
+        name: Name to search for
+        auto_select_first: If True, automatically select the first match
     
     Returns:
         str: The candidate ID if found, None if not found.
@@ -29,12 +33,25 @@ def search_candidate(name):
     
     try:
         response = httpx.get(url, params=params)
-        response.raise_for_status()  # Raise exception for bad status codes
+        response.raise_for_status()
         data = response.json()
         
         if not data["results"]:
             print(f"No candidates found matching '{name}'")
             return None
+            
+        # If auto_select_first is True, select the most recent active candidate
+        if auto_select_first and data["results"]:
+            # Sort by most recent election year and prefer Senate/House over Presidential
+            candidates = sorted(
+                data["results"],
+                key=lambda x: (
+                    max(x.get('election_years', [0])),  # Most recent year first
+                    x['office_full'] != 'President'  # Prefer Senate/House over President
+                ),
+                reverse=True
+            )
+            return candidates[0]["candidate_id"]
             
         # Print all matches
         print(f"\nFound {len(data['results'])} matching candidates:")
