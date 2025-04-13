@@ -9,7 +9,9 @@ import {
   Text,
   Spinner,
   Center,
-  Divider,
+  Grid,
+  HStack,
+  Flex,
 } from '@chakra-ui/react';
 
 interface Senator {
@@ -80,51 +82,78 @@ const Politician = () => {
   return (
     <Container maxW="container.xl" py={8}>
       <VStack spacing={8} align="stretch">
-        {/* Hero Section */}
+        {/* Top Banner */}
         <Box
-          bg="gray.100"
-          borderRadius="40"
-          overflow="hidden"
-          position="relative"
-          height="300px"
+          bg="white"
+          p={6}
+          borderRadius="xl"
+          boxShadow="md"
+          width="100%"
         >
-          <Image
-            src={senator.photoUrl || "https://i.imgur.com/VlKTQWO.png"}
-            alt={senator.name}
-            objectFit="cover"
-            w="100%"
-            h="100%"
-            filter="brightness(0.7)"
-          />
+          <Flex>
+            <Image
+              src={senator.photoUrl || "https://i.imgur.com/VlKTQWO.png"}
+              alt={senator.name}
+              boxSize="150px"
+              objectFit="cover"
+              borderRadius="xl"
+            />
+            <VStack align="flex-start" ml={8} spacing={2}>
+              <Heading size="xl">{senator.name}</Heading>
+              <Text fontSize="lg" color="gray.600">
+                {senator.party} - {senator.state}
+              </Text>
+              {senator.phones && senator.phones.length > 0 && (
+                <Text fontSize="md">Phone: {senator.phones[0]}</Text>
+              )}
+            </VStack>
+          </Flex>
+        </Box>
+
+        {/* Two Column Layout */}
+        <Grid templateColumns={{ base: "1fr", lg: "1fr 1fr" }} gap={8}>
+          {/* Left Column */}
+          <VStack spacing={8}>
+            {/* Affiliated PACs Box */}
+            <Box
+              bg="white"
+              p={6}
+              borderRadius="xl"
+              boxShadow="md"
+              width="100%"
+              height="400px"
+            >
+              <Heading size="lg" mb={4}>AFFILIATED PACS</Heading>
+              <Text color="gray.500">PAC information will be added here...</Text>
+            </Box>
+
+            {/* Industries Box */}
+            <Box
+              bg="white"
+              p={6}
+              borderRadius="xl"
+              boxShadow="md"
+              width="100%"
+              height="400px"
+            >
+              <Heading size="lg" mb={4}>INDUSTRIES</Heading>
+              <Text color="gray.500">Industry information will be added here...</Text>
+            </Box>
+          </VStack>
+
+          {/* Right Column - Chat Box */}
           <Box
-            position="absolute"
-            bottom="0"
-            left="0"
-            right="0"
-            p={8}
-            bg="rgba(0, 0, 0, 0.5)"
-            color="white"
+            bg="white"
+            p={6}
+            borderRadius="xl"
+            boxShadow="md"
+            width="100%"
+            height="850px"
           >
-            <Heading size="2xl">{senator.name}</Heading>
-            <Text fontSize="xl">{senator.party} - {senator.state}</Text>
+            <Heading size="lg" mb={4}>AI Analysis</Heading>
+            <Text color="gray.500">Gemini agent chat will be integrated here...</Text>
           </Box>
-        </Box>
-
-        {/* Contact Information */}
-        <Box bg="white" p={6} borderRadius="xl" boxShadow="md">
-          <Heading size="md" mb={4}>Contact Information</Heading>
-          {senator.phones && senator.phones.length > 0 && (
-            <Text>Phone: {senator.phones[0]}</Text>
-          )}
-        </Box>
-
-        {/* Financial Analysis Section - Placeholder */}
-        <Box bg="white" p={6} borderRadius="xl" boxShadow="md">
-          <Heading size="md" mb={4}>Financial Analysis</Heading>
-          <Text color="gray.500">
-            Financial analysis report will be integrated here...
-          </Text>
-        </Box>
+        </Grid>
       </VStack>
     </Container>
   );
