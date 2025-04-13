@@ -2,6 +2,7 @@ import csv
 import sqlite3
 from collections import defaultdict
 from candidate_functions import search_candidate
+from contribute import classify_industry
 
 def load_headers(header_csv_path):
     """Load column headers from the CSV file"""
@@ -20,7 +21,7 @@ def init_db():
         # Drop existing table to recreate with new schema
         c.execute('DROP TABLE IF EXISTS contributorsFromCommittees')
         
-        # Create table for contributions
+        # Create table for contributions with new industry column
         c.execute('''
             CREATE TABLE IF NOT EXISTS contributorsFromCommittees (
                 candidate_id TEXT,
@@ -28,6 +29,7 @@ def init_db():
                 entity_type TEXT,
                 amount REAL,
                 year INTEGER,
+                industry TEXT,
                 PRIMARY KEY (candidate_id, contributor_name, year)
             )
         ''')
@@ -61,18 +63,23 @@ def load_contributions_to_db(data_path, headers, conn, year):
                 continue
                 
             data = dict(zip(headers, parts))
+            contributor_name = data['NAME']
+            industry = classify_industry(contributor_name)  # Classify industry for each contributor
+            
             batch.append((
                 data['CAND_ID'],
-                data['NAME'],
+                contributor_name,
                 data['ENTITY_TP'],
                 float(data['TRANSACTION_AMT']),
-                year
+                year,
+                industry
             ))
             
             if len(batch) >= batch_size:
                 c.executemany('''
-                    INSERT INTO contributorsFromCommittees (candidate_id, contributor_name, entity_type, amount, year)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO contributorsFromCommittees 
+                    (candidate_id, contributor_name, entity_type, amount, year, industry)
+                    VALUES (?, ?, ?, ?, ?, ?)
                     ON CONFLICT(candidate_id, contributor_name, year) 
                     DO UPDATE SET amount = amount + excluded.amount
                 ''', batch)
@@ -81,8 +88,9 @@ def load_contributions_to_db(data_path, headers, conn, year):
     # Insert any remaining records
     if batch:
         c.executemany('''
-            INSERT INTO contributorsFromCommittees (candidate_id, contributor_name, entity_type, amount, year)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO contributorsFromCommittees 
+            (candidate_id, contributor_name, entity_type, amount, year, industry)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(candidate_id, contributor_name, year) 
             DO UPDATE SET amount = amount + excluded.amount
         ''', batch)
@@ -95,7 +103,6 @@ if __name__ == "__main__":
     
     # Load data into database (only need to do this once)
     headers = load_headers('./data/contributions-from-committees/con-from-com-header.csv')
-    
     # Define the data files and their corresponding years
     data_files = [
         ('./data/contributions-from-committees/con-from-com-21-22.txt', 2021),
