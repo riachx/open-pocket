@@ -63,7 +63,7 @@ const Landing = () => {
 
             <Button
               as={Link}
-              to="/explore"
+              to="/about"
               size="lg"
               bg="white"
               color="#1D2E93"
@@ -73,7 +73,7 @@ const Landing = () => {
               }}
               mt={4}
             >
-              Explore →
+              Read more →
             </Button>
           </VStack>
         </Container>
@@ -106,16 +106,17 @@ const Landing = () => {
                 color="transparent"
                 size="2xl"
                 lineHeight="1.2"
+                letterSpacing="tighter"
               >
                 Track and explore the interests of politicians.
               </Heading>
               
-              <Text fontSize="xl" color="gray.800">
-                Because the financial interests of our leaders shouldn't be a secret. Because the financial interests of our leaders shouldn't be a secret.
+              <Text fontSize="xl" color="gray.800" letterSpacing={"tight"}>
+              We shine a light on where the money flows—whether it’s campaign donations, Super PAC expenditures, or lobbying efforts—so you can understand who really holds the power behind the policies.
               </Text>
               
-              <Text fontSize="xl" color="gray.800">
-                Because the financial interests of our leaders shouldn't be a secret.
+              <Text fontSize="xl" color="gray.800" letterSpacing={"tight"}>
+              OpenPockets allows you to see who’s really backing your ballot.
               </Text>
             </VStack>
           </GridItem>

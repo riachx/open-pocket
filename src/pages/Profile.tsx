@@ -5,6 +5,12 @@ import {
   Input, InputGroup, InputLeftElement, Button, Heading, Flex
 } from '@chakra-ui/react';
 import { SearchIcon } from '@chakra-ui/icons';
+import { motion } from 'framer-motion';
+
+// Create motion components
+const MotionBox = motion(Box);
+const MotionFlex = motion(Flex);
+const MotionSimpleGrid = motion(SimpleGrid);
 
 interface Senator {
   id: number;
@@ -20,6 +26,27 @@ const Profile = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        when: "beforeChildren",
+        staggerChildren: 0.15
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.6, ease: "easeOut" }
+    }
+  };
 
   useEffect(() => {
     const fetchSenators = async () => {
@@ -76,9 +103,13 @@ const Profile = () => {
   }
 
   return (
-    <Box>
+    <MotionBox
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+    >
       {/* Hero Banner */}
-      <Box 
+      <MotionBox 
         backgroundImage="/american-flag-bg.png"
         backgroundSize="cover"
         backgroundPosition="center"
@@ -87,6 +118,7 @@ const Profile = () => {
         p={12}
         height="200px"
         position="relative"
+        variants={itemVariants}
       >
         <Heading 
           as="h1" 
@@ -94,13 +126,14 @@ const Profile = () => {
           color="white" 
           fontWeight="bold"
           marginTop={2}
+          letterSpacing="tighter"
         >
           Politicians
         </Heading>
-      </Box>
+      </MotionBox>
 
       {/* Search Section */}
-      <Flex 
+      <MotionFlex 
         wrap="wrap" 
         justify="space-between" 
         align="center" 
@@ -108,12 +141,14 @@ const Profile = () => {
         bg="gray.100"
         m={4}
         borderRadius="40"
+        variants={itemVariants}
       >
         <Box 
           p={4}
           fontWeight="medium"
           fontSize="3xl"
           minW="200px"
+          letterSpacing="tight"
         >
           Senators
         </Box>
@@ -138,13 +173,23 @@ const Profile = () => {
             Search
           </Button>
         </Flex>
-      </Flex>
+      </MotionFlex>
 
       {/* Senators Grid */}
-      <Box bg="gray.100" mx={4} borderRadius="40" p={6}>
-        <SimpleGrid columns={{ base: 4, md: 6, lg: 8 }} spacing={4}>
-          {filteredSenators.map((senator) => (
-            <Box
+      <MotionBox 
+        bg="gray.100" 
+        mx={4} 
+        borderRadius="40" 
+        p={6}
+        variants={itemVariants}
+      >
+        <MotionSimpleGrid 
+          columns={{ base: 4, md: 6, lg: 8 }} 
+          spacing={4}
+          variants={containerVariants}
+        >
+          {filteredSenators.map((senator, index) => (
+            <MotionBox
               key={senator.id}
               borderRadius="2xl"
               overflow="hidden"
@@ -152,6 +197,11 @@ const Profile = () => {
               bg="white"
               p={3}
               mx="auto"
+              variants={itemVariants}
+              custom={index}
+              initial="hidden"
+              animate="visible"
+              transition={{ delay: index * 0.05 }}
             >
               <VStack>
                 <Image
@@ -169,11 +219,11 @@ const Profile = () => {
                   {senator.party} - {senator.state}
                 </Text>
               </VStack>
-            </Box>
+            </MotionBox>
           ))}
-        </SimpleGrid>
-      </Box>
-    </Box>
+        </MotionSimpleGrid>
+      </MotionBox>
+    </MotionBox>
   );
 };
 

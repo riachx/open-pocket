@@ -13,8 +13,9 @@ const Navbar = () => {
             fontSize="2xl"
             fontWeight="bold"
             _hover={{ textDecoration: 'none' }}
+            letterSpacing="tighter"
           >
-            OpenSecrets
+            OpenPockets
           </ChakraLink>
 
           <HStack spacing={8}>
@@ -30,9 +31,7 @@ const Navbar = () => {
           </HStack>
 
           <HStack spacing={4}>
-            <Button as={Link} to="/login" variant="ghost">
-              Login
-            </Button>
+            
             <Button
               as={Link}
               to="/get-started"

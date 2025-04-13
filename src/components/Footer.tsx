@@ -6,8 +6,9 @@ const Footer = () => {
   return (
     <Box
       as="footer"
-      bgGradient="linear(to-r, #BE2C47 0%, #BE2C47 0%, #1D2E93 24%, #0D1753 80%, #0D1753 100%)"
-      color="white"
+      //bgGradient="linear(to-r, #BE2C47 0%, #BE2C47 0%, #1D2E93 24%, #0D1753 80%, #0D1753 100%)"
+      bgColor="#EFEFEF"
+      color="gray.800"
       py={8}
     >
       <Container maxW="container.xl">
@@ -16,18 +17,19 @@ const Footer = () => {
           alignItems="center"
           justifyContent="center"
           textAlign="center"
-          gap={3}
+          gap={1}
         >
           <Heading
             as="h2"
             fontSize="3xl"
             fontWeight="medium"
             mb={1}
+            letterSpacing="tighter"
           >
             OpenPockets
           </Heading>
           
-          <Flex gap={10}>
+          <Flex gap={8}>
             <Link 
               as={RouterLink} 
               to="/about" 
