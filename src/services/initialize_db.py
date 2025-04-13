@@ -1,7 +1,6 @@
 import csv
 import sqlite3
 from collections import defaultdict
-from candidate_functions import search_candidate
 
 def load_headers(header_csv_path):
     """Load column headers from the CSV file"""
@@ -13,11 +12,11 @@ def load_headers(header_csv_path):
 def init_db():
     """Initialize the SQLite database and create necessary tables"""
     try:
-        # Close any existing connections
+        # close any existing connections
         conn = sqlite3.connect('politicaldata.db', timeout=20)
         c = conn.cursor()
         
-        # Drop existing table to recreate with new schema
+        # drop existing table to recreate with new schema
         c.execute('DROP TABLE IF EXISTS contributorsFromCommittees')
         
         # Create table for contributions
@@ -90,27 +89,23 @@ def load_contributions_to_db(data_path, headers, conn, year):
     conn.commit()
 
 if __name__ == "__main__":
-    # Initialize database
+    # initialize database
     conn = init_db()
     
-    # Load data into database (only need to do this once)
-    headers = load_headers('./data/contributions-from-committees/con-from-com-header.csv')
+    # load data into database (only need to do this once)
+    headers = load_headers('../assets/data/contributions-from-committees/con-from-com-header.csv')
     
-    # Define the data files and their corresponding years
+    # define the data files and their corresponding years
     data_files = [
-        ('./data/contributions-from-committees/con-from-com-21-22.txt', 2021),
-        ('./data/contributions-from-committees/con-from-com-23-24.txt', 2023),
-        ('./data/contributions-from-committees/con-from-com-25-26.txt', 2025)
+        ('../assets/data/contributions-from-committees/con-from-com-21-22.txt', 2021),
+        ('../assets/data/contributions-from-committees/con-from-com-23-24.txt', 2023),
+        ('../assets/data/contributions-from-committees/con-from-com-25-26.txt', 2025)
     ]
     
     # Load each file with its corresponding year
     for file_path, year in data_files:
         print(f"Loading data for year {year}...")
         load_contributions_to_db(file_path, headers, conn, year)
-    
-    # Query contributorsFromCommittees
-    #candidate_id = search_candidate('Donald Trump')
-    #query_contributors(candidate_id, conn)
     
     # Close database connection
     conn.close()

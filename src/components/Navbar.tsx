@@ -13,15 +13,16 @@ const Navbar = () => {
             fontSize="2xl"
             fontWeight="bold"
             _hover={{ textDecoration: 'none' }}
+            letterSpacing="tighter"
           >
-            Govtruth.io
+            OpenPockets
           </ChakraLink>
 
           <HStack spacing={8}>
             <ChakraLink as={Link} to="/about">
               About
             </ChakraLink>
-            <ChakraLink as={Link} to="/profiles">
+            <ChakraLink as={Link} to="/profile">
               Profiles
             </ChakraLink>
             <ChakraLink as={Link} to="/explore">
@@ -30,12 +31,10 @@ const Navbar = () => {
           </HStack>
 
           <HStack spacing={4}>
-            <Button as={Link} to="/login" variant="ghost">
-              Login
-            </Button>
+            
             <Button
               as={Link}
-              to="/get-started"
+              to="/explore"
               bg="#1D2E93"
               color="white"
               _hover={{ bg: 'blue.800' }}
