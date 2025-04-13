@@ -34,7 +34,7 @@ const Navbar = () => {
             
             <Button
               as={Link}
-              to="/get-started"
+              to="/explore"
               bg="#1D2E93"
               color="white"
               _hover={{ bg: 'blue.800' }}

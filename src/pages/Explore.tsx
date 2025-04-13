@@ -126,7 +126,6 @@ const Explore = () => {
                 fontWeight="bold" 
                 p={4}
                 color="white"
-                textShadow="1px 1px 3px rgba(0,0,0,0.8)"
                 zIndex={1}
                 position="relative"
               >
