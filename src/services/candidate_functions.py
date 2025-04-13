@@ -11,10 +11,14 @@ if not API_KEY:
     raise ValueError("OPENFEC_API_KEY is not set. Make sure it's in your .env file.")
 
 
-def search_candidate(name):
+def search_candidate(name, auto_select_first=False):
     """
     Search for a candidate with a specific name
-
+    
+    Args:
+        name: Name to search for
+        auto_select_first: If True, automatically select the first match
+    
     Returns:
         str: The candidate ID if found, None if not found.
     """
@@ -23,21 +27,63 @@ def search_candidate(name):
         "api_key": API_KEY,
         "q": name,
         "page": 1,
-        "per_page": 5
+        "per_page": 5,
+        "sort": "-election_years"  # Sort by most recent election year
     }
-    response = httpx.get(url, params=params)
-    data = response.json()
-
-    for result in data["results"]:
-        print(f"Name: {result['name']}")
-        print(f"Office: {result['office_full']}")
-        print(f"Party: {result.get('party_full', 'N/A')}")
-        print(f"Candidate ID: {result['candidate_id']}")
-        print(f"Year: {result.get('election_year', 'N/A')}") # get doesn't error if the value doesn't exist
-        print("-" * 40)
-        return result['candidate_id']  # Return the first matching candidate's ID
-    
-    return None  # Return None if no candidates found
+    try:
+        response = httpx.get(url, params=params)
+        response.raise_for_status()
+        data = response.json()
+        
+        if not data["results"]:
+            print(f"No candidates found matching '{name}'")
+            return None
+            
+        # If auto_select_first is True, select the most recent active candidate
+        if auto_select_first and data["results"]:
+            # Sort by most recent election year and prefer Senate/House over Presidential
+            candidates = sorted(
+                data["results"],
+                key=lambda x: (
+                    max(x.get('election_years', [0])),  # Most recent year first
+                    x['office_full'] != 'President'  # Prefer Senate/House over President
+                ),
+                reverse=True
+            )
+            return candidates[0]["candidate_id"]
+            
+        # Print all matches
+        print(f"\nFound {len(data['results'])} matching candidates:")
+        for i, result in enumerate(data["results"], 1):
+            print(f"\n{i}. {result['name']}")
+            print(f"   Office: {result['office_full']}")
+            print(f"   Party: {result.get('party_full', 'N/A')}")
+            print(f"   Election Years: {result.get('election_years', ['N/A'])}")
+            print(f"   Candidate ID: {result['candidate_id']}")
+            print("-" * 40)
+        
+        if len(data["results"]) == 1:
+            return data["results"][0]["candidate_id"]
+            
+        # Let user choose if multiple matches
+        while True:
+            choice = input("\nEnter the number of the candidate you want (or 'q' to quit): ")
+            if choice.lower() == 'q':
+                return None
+            try:
+                index = int(choice) - 1
+                if 0 <= index < len(data["results"]):
+                    return data["results"][index]["candidate_id"]
+                print("Invalid number. Please try again.")
+            except ValueError:
+                print("Please enter a valid number or 'q' to quit.")
+                
+    except httpx.HTTPError as e:
+        print(f"Error accessing FEC API: {e}")
+        return None
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return None
 
 def candidate_info(candidate_id):
     """
@@ -74,5 +120,4 @@ def candidate_info(candidate_id):
         "first_election_year": result.get("first_election_year", "N/A"),
         "last_election_year": result.get("election_years", [])[-1] if result.get("election_years") else "N/A",
     }
-
 
