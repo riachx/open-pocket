@@ -5,7 +5,7 @@ import {
 import { ArrowForwardIcon } from '@chakra-ui/icons';
 import { motion } from 'framer-motion';
 
-// Create motion components
+// MOTION STUFF
 const MotionBox = motion(Box);
 const MotionGrid = motion(Grid);
 const MotionGridItem = motion(GridItem);
@@ -13,7 +13,7 @@ const MotionFlex = motion(Flex);
 const MotionContainer = motion(Container);
 
 const About = () => {
-  // Animation variants
+  // animations
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {

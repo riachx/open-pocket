@@ -11,6 +11,7 @@ import {
 } from '@chakra-ui/react';
 import { ArrowForwardIcon } from '@chakra-ui/icons';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 
 // Create motion components
 const MotionBox = motion(Box);
@@ -18,6 +19,8 @@ const MotionFlex = motion(Flex);
 const MotionSimpleGrid = motion(SimpleGrid);
 
 const Explore = () => {
+  const navigate = useNavigate();
+
   // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -46,6 +49,10 @@ const Explore = () => {
     { name: "Oil & Gas", image: "/oil.png" },
     { name: "Electronics & Tech", image: "/speech.png" }
   ];
+
+  const handleIndustryClick = (industryName: string) => {
+    navigate(`/industry/${encodeURIComponent(industryName)}`);
+  };
 
   return (
     <MotionBox
@@ -104,6 +111,12 @@ const Explore = () => {
               display="flex"
               flexDirection="column"
               justifyContent="space-between"
+              cursor="pointer"
+              onClick={() => handleIndustryClick(industry.name)}
+              _hover={{ 
+                transform: "translateY(-5px)",
+                transition: "transform 0.3s ease-in-out"
+              }}
             >
               <Box
                 position="absolute"

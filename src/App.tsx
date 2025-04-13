@@ -7,6 +7,7 @@ import Landing from './pages/Landing';
 import Explore from './pages/Explore';
 import Profile from './pages/Profile';
 import About from './pages/About';
+import IndustryDetail from './pages/IndustryDetail';
 
 // Create a custom theme with DM Sans font
 const theme = extendTheme({
@@ -26,6 +27,7 @@ function App() {
             <Route path="/" element={<Landing />} />
             <Route path="/about" element={<About />} />
             <Route path="/explore" element={<Explore />} />
+            <Route path="/industry/:industry" element={<IndustryDetail />} />
             <Route path="/profile" element={<Profile />} />
           </Routes>
           <Footer />

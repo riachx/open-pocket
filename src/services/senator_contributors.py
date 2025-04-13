@@ -1,7 +1,8 @@
 import sqlite3
 import json
 from query_senators import get_senators_by_state, get_senators_by_party, get_all_senators
-from candidate_functions import search_candidate
+from candidate_functions import getCandidateIdByName
+
 
 def get_db_connection():
     """Get a connection to the SQLite database with proper error handling"""
@@ -23,7 +24,7 @@ def find_senator_contributors(senator_name, year=None, conn=None):
     
     try:
         # First, search for the candidate ID using the senator's name
-        candidate_id = search_candidate(senator_name)
+        candidate_id = getCandidateIdByName(senator_name)
         
         if not candidate_id:
             print(f"No candidate found with name: {senator_name}")
@@ -75,13 +76,13 @@ def analyze_senator_contributions():
             print(f"\nAnalyzing contributions for {senator_name} ({senator['state']})...")
             
             # Search for the candidate ID
-            candidate_id = search_candidate(senator_name)
+            candidate_id = getCandidateIdByName(senator_name)
             
             if not candidate_id:
                 print(f"No candidate ID found for {senator_name}")
                 continue
             
-            # Get total contributions by year
+            # get total contributions by year
             c = conn.cursor()
             c.execute('''
                 SELECT year, SUM(amount) as total_amount, COUNT(*) as contributor_count
@@ -101,7 +102,7 @@ def analyze_senator_contributions():
             for year, total_amount, contributor_count in year_results:
                 print(f"  {year}: ${total_amount:,.2f} from {contributor_count} contributors")
             
-            # Get top 5 contributors
+            # get top 5 contributors
             c.execute('''
                 SELECT contributor_name, SUM(amount) as total_amount
                 FROM contributorsFromCommittees

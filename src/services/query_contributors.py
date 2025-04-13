@@ -78,7 +78,7 @@ def query_contributors_by_year(candidate_id, year, conn=None):
 
 if __name__ == "__main__":
     # Example usage
-    candidate_id = search_candidate('Donald Trump')
+    '''candidate_id = search_candidate('Donald Trump')
     
     if candidate_id:
         # Get detailed candidate info
@@ -98,15 +98,5 @@ if __name__ == "__main__":
         print("\nContribution Information:")
         query_contributors(candidate_id)
     else:
-        print(f"No candidate found with id: {candidate_id}")
+        print(f"No candidate found with id: {candidate_id}")'''
     
-    
-
-    
-    # Query contributions for a specific year
-    #print("\nContributions for 2023:")
-    #query_contributors_by_year(candidate_id, 2023)
-    
-    # Get total contributions by year
-    #get_total_contributions_by_year(candidate_id)
-
