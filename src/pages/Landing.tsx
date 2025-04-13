@@ -1,8 +1,27 @@
 // src/pages/Landing.tsx
-import { Box, Container, Heading, Text, Button, VStack, Image, Flex, Grid, GridItem } from '@chakra-ui/react';
-import { Link } from 'react-router-dom';
+import { 
+  Box, Container, Heading, Text, Button, VStack, Image, Flex, Grid, GridItem,
+  Menu, MenuButton, MenuList, MenuItem, Icon
+} from '@chakra-ui/react';
+import { ChevronDownIcon } from '@chakra-ui/icons';
+import { Link, useNavigate } from 'react-router-dom';
 
 const Landing = () => {
+  const navigate = useNavigate();
+  
+  // Industry list matching what's available on Explore page
+  const industries = [
+    "Pharmaceuticals",
+    "Military & Defense",
+    "Insurance",
+    "Oil & Gas", 
+    "Electronics & Tech"
+  ];
+
+  const handleIndustrySelect = (industry: string) => {
+    navigate(`/industry/${encodeURIComponent(industry)}`);
+  };
+
   return (
     <Box>
       {/* First Section - Hero Banner */}
@@ -50,7 +69,7 @@ const Landing = () => {
               fontWeight="bold"
               letterSpacing="tight"
             >
-              OpenPockets
+              OpenPocket
             </Heading>
             
             <Text
@@ -61,23 +80,78 @@ const Landing = () => {
               Because the financial interests of our leaders shouldn't be a secret.
             </Text>
 
-            <Button
-              as={Link}
-              to="/about"
-              size="lg"
-              bg="white"
-              color="#1D2E93"
-              px={8}
-              _hover={{
-                bg: 'gray.100'
-              }}
-              mt={4}
-            >
-              Read more →
-            </Button>
+            <Flex gap={4} mt={4}>
+              <Button
+                as={Link}
+                to="/explore"
+                size="lg"
+                bg="white"
+                color="#1D2E93"
+                px={8}
+                _hover={{
+                  bg: 'gray.100'
+                }}
+              >
+                Explore →
+              </Button>
+              
+              
+            </Flex>
+
+            
+            
+
+      <Menu placement="bottom" strategy="fixed" autoSelect={false}>
+                <MenuButton
+                  position="absolute"
+                  bottom="20px"
+                  left="50%"
+                  transform="translateX(-50%)"
+                  as={Button}
+                  rightIcon={<ChevronDownIcon />}
+                  bg="rgba(255, 255, 255, 1)"
+                  color="gray.800"
+                  size="lg"
+                  _hover={{ bg: 'white' }}
+                  _active={{ bg: 'white' }}
+                  boxShadow={"lg"}
+                  width="500px"
+                  height="60px"
+                  zIndex={2}
+                >
+                  Explore by Category
+                </MenuButton>
+                <MenuList 
+                  mt="2px" 
+                  zIndex={3}
+                  minWidth="500px"
+                >
+                  {industries.map((industry, index) => (
+                    <MenuItem 
+                      key={index}
+                      onClick={() => handleIndustrySelect(industry)}
+                      color="#1D2E93"
+                      _hover={{
+                        bg: 'gray.100',
+                        color: '#b5305f'
+                      }}
+                      fontWeight="medium"
+                    >
+                      {industry}
+                    </MenuItem>
+                  ))}
+                </MenuList>
+              </Menu>
+
           </VStack>
+          
+
+          
         </Container>
+
+        
       </Box>
+
 
       {/* Second Section - Capitol Image with Mission */}
       <Container maxW="container.xl" py={20}>
@@ -112,11 +186,11 @@ const Landing = () => {
               </Heading>
               
               <Text fontSize="xl" color="gray.800" letterSpacing={"tight"}>
-              We shine a light on where the money flows—whether it’s campaign donations, Super PAC expenditures, or lobbying efforts—so you can understand who really holds the power behind the policies.
+              We shine a light on where the money flows—whether it's campaign donations, Super PAC expenditures, or lobbying efforts—so you can understand who really holds the power behind the policies.
               </Text>
               
               <Text fontSize="xl" color="gray.800" letterSpacing={"tight"}>
-              OpenPockets allows you to see who’s really backing your ballot.
+              OpenPockets allows you to see who's really backing your ballot.
               </Text>
             </VStack>
           </GridItem>
