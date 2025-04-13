@@ -645,6 +645,52 @@ app.get('/api/debug-candidates-master', async (req, res) => {
   }
 });
 
+// Add endpoint to get a senator by ID
+app.get('/api/senators/:id', async (req, res) => {
+  let db;
+  try {
+    const { id } = req.params;
+    console.log(`Fetching senator with ID: ${id}`);
+    
+    db = await setupDatabase();
+    
+    // Convert string ID to number for comparison
+    const numericId = parseInt(id, 10);
+    
+    if (isNaN(numericId)) {
+      return res.status(400).json({ error: 'Invalid ID format' });
+    }
+    
+    const senator = await db.get('SELECT * FROM senate WHERE id = ?', numericId);
+    
+    if (!senator) {
+      return res.status(404).json({ error: 'Senator not found' });
+    }
+    
+    // Format phones as array if it exists
+    const formattedSenator = {
+      id: senator.id,
+      name: senator.name,
+      party: senator.party,
+      state: senator.state,
+      photoUrl: senator.photoUrl,
+      phones: senator.phones ? JSON.parse(senator.phones) : []
+    };
+    
+    res.json(formattedSenator);
+  } catch (error) {
+    console.error(`Error fetching senator with ID ${req.params.id}:`, error);
+    res.status(500).json({ 
+      error: 'Failed to fetch senator', 
+      details: error.message 
+    });
+  } finally {
+    if (db) {
+      await db.close();
+    }
+  }
+});
+
 // Helper function to get full party name
 function getFullPartyName(partyCode, partyAffiliation) {
   if (partyAffiliation && partyAffiliation !== '') {

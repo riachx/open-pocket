@@ -5,12 +5,7 @@ import {
   Input, InputGroup, InputLeftElement, Button, Heading, Flex
 } from '@chakra-ui/react';
 import { SearchIcon } from '@chakra-ui/icons';
-import { motion } from 'framer-motion';
-
-// Create motion components
-const MotionBox = motion(Box);
-const MotionFlex = motion(Flex);
-const MotionSimpleGrid = motion(SimpleGrid);
+import { Link } from 'react-router-dom';
 
 interface Senator {
   id: number;
@@ -27,27 +22,6 @@ const Profile = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Animation variants
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        when: "beforeChildren",
-        staggerChildren: 0.15
-      }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.6, ease: "easeOut" }
-    }
-  };
-
   useEffect(() => {
     const fetchSenators = async () => {
       try {
@@ -61,7 +35,7 @@ const Profile = () => {
         }
         
         const data = await response.json();
-        console.log('Received data:', data);
+        console.log('Received senators data:', data);
         setSenators(data);
       } catch (err) {
         console.error('Error fetching senators:', err);
@@ -103,13 +77,9 @@ const Profile = () => {
   }
 
   return (
-    <MotionBox
-      initial="hidden"
-      animate="visible"
-      variants={containerVariants}
-    >
+    <Box>
       {/* Hero Banner */}
-      <MotionBox 
+      <Box 
         backgroundImage="/american-flag-bg.png"
         backgroundSize="cover"
         backgroundPosition="center"
@@ -118,7 +88,6 @@ const Profile = () => {
         p={12}
         height="200px"
         position="relative"
-        variants={itemVariants}
       >
         <Heading 
           as="h1" 
@@ -126,14 +95,13 @@ const Profile = () => {
           color="white" 
           fontWeight="bold"
           marginTop={2}
-          letterSpacing="tighter"
         >
           Politicians
         </Heading>
-      </MotionBox>
+      </Box>
 
       {/* Search Section */}
-      <MotionFlex 
+      <Flex 
         wrap="wrap" 
         justify="space-between" 
         align="center" 
@@ -141,14 +109,12 @@ const Profile = () => {
         bg="gray.100"
         m={4}
         borderRadius="40"
-        variants={itemVariants}
       >
         <Box 
           p={4}
           fontWeight="medium"
           fontSize="3xl"
           minW="200px"
-          letterSpacing="tight"
         >
           Senators
         </Box>
@@ -173,57 +139,52 @@ const Profile = () => {
             Search
           </Button>
         </Flex>
-      </MotionFlex>
+      </Flex>
 
       {/* Senators Grid */}
-      <MotionBox 
-        bg="gray.100" 
-        mx={4} 
-        borderRadius="40" 
-        p={6}
-        variants={itemVariants}
-      >
-        <MotionSimpleGrid 
-          columns={{ base: 4, md: 6, lg: 8 }} 
-          spacing={4}
-          variants={containerVariants}
-        >
-          {filteredSenators.map((senator, index) => (
-            <MotionBox
+      <Box bg="gray.100" mx={4} borderRadius="40" p={6}>
+        <SimpleGrid columns={{ base: 4, md: 6, lg: 8 }} spacing={4}>
+          {filteredSenators.map((senator) => (
+            <Link 
+              to={`/politician/${senator.id}`} 
               key={senator.id}
-              borderRadius="2xl"
-              overflow="hidden"
-              boxShadow="md"
-              bg="white"
-              p={3}
-              mx="auto"
-              variants={itemVariants}
-              custom={index}
-              initial="hidden"
-              animate="visible"
-              transition={{ delay: index * 0.05 }}
+              style={{ textDecoration: 'none' }}
             >
-              <VStack>
-                <Image
-                  src={senator.photoUrl || "https://i.imgur.com/VlKTQWO.png"}
-                  alt={senator.name}
-                  borderRadius="2xl"
-                  boxSize="100px"
-                  objectFit="cover"
-                  fallbackSrc="https://i.imgur.com/VlKTQWO.png"
-                />
-                <Text fontWeight="bold" textAlign="center" fontSize="sm">
-                  {senator.name}
-                </Text>
-                <Text fontSize="xs" color="gray.600">
-                  {senator.party} - {senator.state}
-                </Text>
-              </VStack>
-            </MotionBox>
+              <Box
+                borderRadius="2xl"
+                overflow="hidden"
+                boxShadow="md"
+                bg="white"
+                p={3}
+                mx="auto"
+                transition="transform 0.2s"
+                _hover={{
+                  transform: 'scale(1.02)',
+                  boxShadow: 'lg',
+                }}
+              >
+                <VStack>
+                  <Image
+                    src={senator.photoUrl || "https://i.imgur.com/VlKTQWO.png"}
+                    alt={senator.name}
+                    borderRadius="2xl"
+                    boxSize="100px"
+                    objectFit="cover"
+                    fallbackSrc="https://i.imgur.com/VlKTQWO.png"
+                  />
+                  <Text fontWeight="bold" textAlign="center" fontSize="sm">
+                    {senator.name}
+                  </Text>
+                  <Text fontSize="xs" color="gray.600">
+                    {senator.party} - {senator.state}
+                  </Text>
+                </VStack>
+              </Box>
+            </Link>
           ))}
-        </MotionSimpleGrid>
-      </MotionBox>
-    </MotionBox>
+        </SimpleGrid>
+      </Box>
+    </Box>
   );
 };
 

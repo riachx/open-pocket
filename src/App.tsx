@@ -8,6 +8,7 @@ import Explore from './pages/Explore';
 import Profile from './pages/Profile';
 import About from './pages/About';
 import IndustryDetail from './pages/IndustryDetail';
+import Politician from './pages/Politician';
 
 // Create a custom theme with DM Sans font
 const theme = extendTheme({
@@ -29,6 +30,7 @@ function App() {
             <Route path="/explore" element={<Explore />} />
             <Route path="/industry/:industry" element={<IndustryDetail />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/politician/:id" element={<Politician />} />
           </Routes>
           <Footer />
         </div>
