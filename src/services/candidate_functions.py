@@ -13,11 +13,11 @@ def getCandidateIdByName(candidate_name):
         conn = sqlite3.connect('politicaldata.db')
         cursor = conn.cursor()
         
-        # Try exact match first
+        # try exact matchy first
         cursor.execute('SELECT CAND_ID FROM candidates WHERE CAND_NAME = ? COLLATE NOCASE', (candidate_name,))
         result = cursor.fetchone()
         
-        # If no exact match, try partial match
+        # if no exact matchy, try partial matchy
         if not result:
             cursor.execute('SELECT CAND_ID FROM candidates WHERE CAND_NAME LIKE ? COLLATE NOCASE LIMIT 1', 
                           (f'%{candidate_name}%',))

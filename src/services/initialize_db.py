@@ -36,6 +36,52 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_candidate 
             ON contributorsFromCommittees(candidate_id)
         ''')
+
+        
+        c.execute('''
+        CREATE TABLE IF NOT EXISTS senators (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            state TEXT,
+            party TEXT,
+            chamber TEXT,
+            image TEXT
+        )
+        ''')
+
+        with open("../assets/data/members.csv", newline='', encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                # Adjust field names based on VoteView CSV columns
+                name = row['name']  # example column name, adjust as needed
+                state = row['state']
+                party = row['party']
+                chamber = row['chamber']
+                # You can derive image filename from name or member id
+                image = row['image']
+
+                c.execute('''
+                    INSERT OR IGNORE INTO senators (name, state, party, chamber, image)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (name, state, party, chamber, image))
+        
+        c.execute('''
+            
+            DELETE FROM senators
+            WHERE rowid NOT IN (
+            SELECT MIN(rowid)
+            FROM senators
+            GROUP BY name, state, party, chamber
+            );
+            
+                  ''')
+        
+        c.execute('''DELETE FROM senators
+            WHERE rowid NOT IN (
+            SELECT MIN(rowid)
+            FROM senators
+            GROUP BY name, state
+            );''')
         
         conn.commit()
         return conn
