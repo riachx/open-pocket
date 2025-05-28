@@ -10,10 +10,10 @@ import { Link } from 'react-router-dom';
 interface Senator {
   id: number;
   name: string;
-  party: string;
   state: string;
-  photoUrl?: string;
-  phones?: string[];
+  party: string;
+  chamber: string;
+  image: string; 
 }
 
 const Profile = () => {
@@ -25,32 +25,26 @@ const Profile = () => {
   useEffect(() => {
     const fetchSenators = async () => {
       try {
-        console.log('Fetching senators...');
-        const response = await fetch('http://localhost:3001/api/senators');
-        
-        console.log('Response status:', response.status);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log('Received senators data:', data);
+        const response = await fetch('http://localhost:3001/api/members');
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+  
+        const data: Senator[] = await response.json();
+        console.log('Fetched senators data:', data); // Add this line to see the data
         setSenators(data);
       } catch (err) {
-        console.error('Error fetching senators:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch senators');
       } finally {
         setIsLoading(false);
       }
     };
-
+  
     fetchSenators();
   }, []);
 
-  const filteredSenators = senators.filter(senator => 
-    senator.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredSenators = senators
+    .filter(s => s.chamber.toLowerCase() === 'senate')
+    .filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
 
   if (isLoading) {
     return (
@@ -76,6 +70,7 @@ const Profile = () => {
     );
   }
 
+ 
   return (
     <Box>
       {/* Hero Banner */}
@@ -95,6 +90,7 @@ const Profile = () => {
           color="white" 
           fontWeight="bold"
           marginTop={2}
+          letterSpacing={"tighter"}
         >
           Politicians
         </Heading>
@@ -143,46 +139,45 @@ const Profile = () => {
 
       {/* Senators Grid */}
       <Box bg="gray.100" mx={4} borderRadius="40" p={6}>
-        <SimpleGrid columns={{ base: 4, md: 6, lg: 8 }} spacing={4}>
-          {filteredSenators.map((senator) => (
-            <Link 
-              to={`/politician/${senator.id}`} 
-              key={senator.id}
-              style={{ textDecoration: 'none' }}
-            >
-              <Box
+      <SimpleGrid columns={{ base: 4, md: 6, lg: 8 }} spacing={4}>
+      {filteredSenators.map((senator) => (
+        <Link 
+        to={`/politician/${senator.id}`}  // Use the ID directly
+          key={senator.id}  // Use ID as key
+          style={{ textDecoration: 'none' }}
+          
+      >
+          <Box
+            borderRadius="2xl"
+            overflow="hidden"
+            boxShadow="md"
+            bg="white"
+            p={3}
+            mx="auto"
+            transition="transform 0.2s"
+            _hover={{ transform: 'scale(1.02)', boxShadow: 'lg' }}
+          >
+            <VStack>
+              <Image
+                src={`http://localhost:3001/${senator.image}`}
+                alt={senator.name}
                 borderRadius="2xl"
-                overflow="hidden"
-                boxShadow="md"
-                bg="white"
-                p={3}
-                mx="auto"
-                transition="transform 0.2s"
-                _hover={{
-                  transform: 'scale(1.02)',
-                  boxShadow: 'lg',
-                }}
-              >
-                <VStack>
-                  <Image
-                    src={senator.photoUrl || "https://i.imgur.com/VlKTQWO.png"}
-                    alt={senator.name}
-                    borderRadius="2xl"
-                    boxSize="100px"
-                    objectFit="cover"
-                    fallbackSrc="https://i.imgur.com/VlKTQWO.png"
-                  />
-                  <Text fontWeight="bold" textAlign="center" fontSize="sm">
-                    {senator.name}
-                  </Text>
-                  <Text fontSize="xs" color="gray.600">
-                    {senator.party} - {senator.state}
-                  </Text>
-                </VStack>
-              </Box>
-            </Link>
-          ))}
-        </SimpleGrid>
+                boxSize="100px"
+                objectFit="cover"
+                fallbackSrc="https://i.imgur.com/VlKTQWO.png"
+              />
+              <Text fontWeight="bold" textAlign="center" fontSize="sm">
+                {senator.name}
+              </Text>
+              <Text fontSize="xs" color="gray.600">
+                {senator.party} - {senator.state}
+              </Text>
+              
+            </VStack>
+          </Box>
+        </Link>
+      ))}
+    </SimpleGrid>
       </Box>
     </Box>
   );
