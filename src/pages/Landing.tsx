@@ -69,7 +69,7 @@ const Landing = () => {
               fontWeight="bold"
               letterSpacing="tight"
             >
-              OpenPocket
+              OpenPockets
             </Heading>
             
             <Text

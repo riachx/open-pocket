@@ -6,15 +6,79 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import fs from 'fs';
+// Import the Google AI SDK
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Initialize Google AI with your API key
+// Get your API key from https://makersuite.google.com/app/apikey
+const API_KEY = 'KEY'; // Replace with your actual API key
+const genAI = new GoogleGenerativeAI(API_KEY);
+
 const app = express();
-const PORT = process.env.PORT || 3001;
 
 // Enable CORS
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:5173', // or whatever port your frontend runs on
+  credentials: true
+}));
+
+const PORT = process.env.PORT || 3001;
+// Serve images from the 'images' folder (adjust path to your actual images folder)
+const imagesPath = path.join(__dirname, '../public/images');
+console.log('__dirname:', __dirname);
+
+app.use('/images', express.static(imagesPath, {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) {
+      res.setHeader('Content-Type', 'image/jpeg');
+    } else if (filePath.endsWith('.png')) {
+      res.setHeader('Content-Type', 'image/png');
+    }
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+  }
+}));
+console.log('Server file loaded3')
+
+
+// Add middleware to parse JSON bodies
+app.use(express.json());
+
+app.get('/api/members', async (req, res) => {
+  let db;
+  try {
+    console.log('Setting up database connection for /api/members');
+    db = await setupDatabase();
+    console.log('Database connection established');
+
+    // Add logging to see what's in the database
+    console.log('Executing query to get senators');
+    const members = await db.all('SELECT id, name, state, party, chamber, image FROM senators'); 
+    console.log(`Found ${members.length} senators in database`);
+    console.log('First member:', members[0]);
+
+    res.json(members);
+  } catch (error) {
+    console.error('Error in /api/members:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Internal Server Error',
+      details: error.message,
+      stack: error.stack
+    });
+  } finally {
+    if (db) {
+      try {
+        await db.close();
+        console.log('Database connection closed');
+      } catch (closeError) {
+        console.error('Error closing database connection:', closeError);
+      }
+    }
+  }
+});
 
 // Database setup
 async function setupDatabase() {
@@ -101,7 +165,7 @@ except Exception as e:
     });
   });
 }
-
+/*
 // API Routes
 app.get('/api/senators', async (req, res) => {
   let db;
@@ -151,6 +215,53 @@ app.get('/api/senators', async (req, res) => {
       } catch (closeError) {
         console.error('Error closing database connection:', closeError);
       }
+    }
+  }
+});
+*/
+// Add this new endpoint
+app.get('/api/senator/:id', async (req, res) => {
+  let db;
+  try {
+    const { id } = req.params;
+    console.log('Fetching senator with ID:', id);
+    
+    db = await setupDatabase();
+    
+    // Add logging to see the query result
+    const senator = await db.get(
+      'SELECT id, name, state, party, chamber, image FROM senators WHERE id = ?',
+      [id]
+    );
+    
+    console.log('Found senator:', senator); // Add this logging
+    
+    if (!senator) {
+      console.log('Senator not found in database');
+      return res.status(404).json({ error: 'Senator not found' });
+    }
+    
+    // Format the response to match the Senator interface
+    const formattedSenator = {
+      id: senator.id,
+      name: senator.name,
+      state: senator.state,
+      party: senator.party,
+      chamber: senator.chamber,
+      image: senator.image
+    };
+    
+    console.log('Sending formatted senator:', formattedSenator); // Add this logging
+    res.json(formattedSenator);
+  } catch (error) {
+    console.error('Error fetching senator:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch senator', 
+      details: error.message 
+    });
+  } finally {
+    if (db) {
+      await db.close();
     }
   }
 });
@@ -646,7 +757,7 @@ app.get('/api/debug-candidates-master', async (req, res) => {
 });
 
 // Add endpoint to get a senator by ID
-app.get('/api/senators/:id', async (req, res) => {
+/*app.get('/api/senators/:id', async (req, res) => {
   let db;
   try {
     const { id } = req.params;
@@ -682,6 +793,143 @@ app.get('/api/senators/:id', async (req, res) => {
     console.error(`Error fetching senator with ID ${req.params.id}:`, error);
     res.status(500).json({ 
       error: 'Failed to fetch senator', 
+      details: error.message 
+    });
+  } finally {
+    if (db) {
+      await db.close();
+    }
+  }
+});
+
+// Add endpoint to get committee contributions for a specific politician
+app.get('/api/senators/:id/committees', async (req, res) => {
+  let db;
+  try {
+    const { id } = req.params;
+    db = await setupDatabase();
+    
+    console.log(`Fetching committee contributions for senator ID: ${id}`);
+    
+    // First, get the senator record to get their candidate_id
+    const senator = await db.get('SELECT * FROM senate WHERE id = ?', id);
+    
+    if (!senator) {
+      console.log(`Senator with ID ${id} not found`);
+      return res.status(404).json({ error: 'Senator not found' });
+    }
+    
+    console.log(`Senator found: ${senator.name}`);
+    
+    // Use the candidate_id field from the senate table
+    let contributions = [];
+    
+    if (senator.candidate_id) {
+      console.log(`Using candidate_id from senate table: ${senator.candidate_id}`);
+      
+      // Use the mapped candidate_id directly
+      contributions = await db.all(`
+        SELECT 
+          CMTE_ID, NAME, ENTITY_TP, TRANSACTION_AMT, TRANSACTION_DT
+        FROM 
+          contributorsFromCommittees
+        WHERE 
+          CAND_ID = ? 
+          AND ENTITY_TP != 'IND'
+        ORDER BY 
+          TRANSACTION_AMT DESC
+        LIMIT 50
+      `, senator.candidate_id);
+      
+      console.log(`Found ${contributions.length} contributions using candidate_id: ${senator.candidate_id}`);
+    } else {
+      console.log(`No candidate_id found for senator ${senator.name}. This shouldn't happen since all are mapped.`);
+    }
+    
+    // Format the contributions for the frontend
+    const formattedContributions = contributions.map(contrib => {
+      return {
+        name: contrib.NAME || contrib.CMTE_ID || 'Unknown',
+        entity_type: contrib.ENTITY_TP || 'Unknown',
+        total_amount: parseFloat(contrib.TRANSACTION_AMT) || 0,
+        transaction_count: 1,
+        transaction_date: contrib.TRANSACTION_DT
+      };
+    });
+    
+    // Group by contributor name and sum amounts
+    const contributionsByCommittee = {};
+    
+    for (const contrib of formattedContributions) {
+      if (!contributionsByCommittee[contrib.name]) {
+        contributionsByCommittee[contrib.name] = {
+          name: contrib.name,
+          entity_type: contrib.entity_type,
+          total_amount: 0,
+          transaction_count: 0
+        };
+      }
+      
+      contributionsByCommittee[contrib.name].total_amount += contrib.total_amount;
+      contributionsByCommittee[contrib.name].transaction_count += 1;
+    }
+    
+    // Convert to array and sort by amount
+    const result = Object.values(contributionsByCommittee)
+      .sort((a, b) => b.total_amount - a.total_amount);
+    
+    console.log(`Found ${result.length} committee contributions for senator ID ${id}`);
+    res.json(result);
+    
+  } catch (error) {
+    console.error(`Error fetching committee contributions for senator ${req.params.id}:`, error);
+    console.error(error.stack);
+    // Return empty array instead of error to avoid breaking the UI
+    res.json([]);
+  } finally {
+    if (db) {
+      await db.close();
+    }
+  }
+});
+*/
+// Add a debug endpoint to check contributors table
+app.get('/api/debug-contributors', async (req, res) => {
+  let db;
+  try {
+    db = await setupDatabase();
+    
+    // Check if the table exists
+    const tableExists = await db.get(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='contributorsFromCommittees'"
+    );
+    
+    if (!tableExists) {
+      return res.json({
+        error: 'Table does not exist',
+        tables: await db.all("SELECT name FROM sqlite_master WHERE type='table'")
+      });
+    }
+    
+    // Get table structure
+    const tableInfo = await db.all("PRAGMA table_info('contributorsFromCommittees')");
+    
+    // Get sample data
+    const sampleData = await db.all("SELECT * FROM contributorsFromCommittees LIMIT 10");
+    
+    // Get count
+    const countResult = await db.get("SELECT COUNT(*) as count FROM contributorsFromCommittees");
+    
+    res.json({
+      tableExists: true,
+      structure: tableInfo,
+      sampleData,
+      count: countResult.count
+    });
+  } catch (error) {
+    console.error('Error checking contributors table:', error);
+    res.status(500).json({ 
+      error: 'Failed to check contributors table', 
       details: error.message 
     });
   } finally {
@@ -844,4 +1092,164 @@ async function setupCandidatesMasterTable() {
 // Create the new table when the server starts
 setupCandidatesMasterTable()
   .then(() => console.log('Candidates master table setup complete'))
-  .catch(err => console.error('Failed to set up candidates master table:', err)); 
+  .catch(err => console.error('Failed to set up candidates master table:', err));
+
+// Special debug endpoint for Tim Scott's contributions
+app.get('/api/tim-scott-debug', async (req, res) => {
+  let db;
+  try {
+    console.log('Executing Tim Scott debug endpoint');
+    
+    db = await setupDatabase();
+    
+    // Directly query using the known FEC ID
+    const contributions = await db.all(`
+      SELECT 
+        CMTE_ID, NAME, ENTITY_TP, TRANSACTION_AMT, TRANSACTION_DT
+      FROM 
+        contributorsFromCommittees
+      WHERE 
+        CAND_ID = 'S4SC00240' 
+        AND ENTITY_TP != 'IND'
+      ORDER BY 
+        TRANSACTION_AMT DESC
+      LIMIT 50
+    `);
+    
+    console.log(`Direct query found ${contributions.length} contributions`);
+    
+    // Format the contributions for the frontend
+    const formattedContributions = contributions.map(contrib => {
+      return {
+        name: contrib.NAME || contrib.CMTE_ID || 'Unknown',
+        entity_type: contrib.ENTITY_TP || 'Unknown',
+        total_amount: parseFloat(contrib.TRANSACTION_AMT) || 0,
+        transaction_count: 1,
+        transaction_date: contrib.TRANSACTION_DT,
+        raw: contrib // Include raw data for debugging
+      };
+    });
+    
+    // Group by contributor name and sum amounts
+    const contributionsByCommittee = {};
+    
+    for (const contrib of formattedContributions) {
+      if (!contributionsByCommittee[contrib.name]) {
+        contributionsByCommittee[contrib.name] = {
+          name: contrib.name,
+          entity_type: contrib.entity_type,
+          total_amount: 0,
+          transaction_count: 0
+        };
+      }
+      
+      contributionsByCommittee[contrib.name].total_amount += contrib.total_amount;
+      contributionsByCommittee[contrib.name].transaction_count += 1;
+    }
+    
+    // Convert to array and sort by amount
+    const result = Object.values(contributionsByCommittee)
+      .sort((a, b) => b.total_amount - a.total_amount);
+    
+    // Debug info
+    const debugInfo = {
+      dbPath: path.resolve(__dirname, 'services/politicaldata.db'),
+      contributionsFound: contributions.length,
+      firstContribution: contributions.length > 0 ? contributions[0] : null,
+      tables: await db.all("SELECT name FROM sqlite_master WHERE type='table';")
+    };
+    
+    res.json({
+      contributions: result,
+      debug: debugInfo
+    });
+    
+  } catch (error) {
+    console.error('Error in Tim Scott debug endpoint:', error);
+    console.error(error.stack);
+    res.status(500).json({
+      error: error.message,
+      stack: error.stack
+    });
+  } finally {
+    if (db) {
+      await db.close();
+    }
+  }
+});
+
+// Gemini AI Chat endpoint
+app.post('/api/gemini-chat', async (req, res) => {
+  try {
+    const { prompt, context, history } = req.body;
+    
+    if (!prompt) {
+      return res.status(400).json({ error: 'Missing prompt in request body' });
+    }
+    
+    console.log('Received chat request:', { prompt, context });
+    
+    // Get the Gemini Pro model
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    
+    // Create a chat session
+    const chat = model.startChat({
+      history: history.map(msg => ({
+        role: msg.role,
+        parts: [{ text: msg.content }]
+      })),
+      generationConfig: {
+        maxOutputTokens: 2048,
+        temperature: 0.7,
+      },
+    });
+    
+    // Format contextual information about the senator for the model
+    let contextPrompt = '';
+    if (context && context.senator) {
+      contextPrompt = `
+Here's information about the politician:
+- Name: ${context.senator.name}
+- Party: ${context.senator.party}
+- State: ${context.senator.state}
+
+Total campaign contributions: ${new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD'
+}).format(context.totalContributions || 0)}
+
+Top contributors: ${context.committees && context.committees.length > 0 ? 
+  context.committees.slice(0, 5).map(comm => 
+    `${comm.name} (${new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(comm.total_amount)})`
+  ).join(', ') : 'No committee data available'}
+`;
+    }
+    
+    // Combine the context and user's question
+    const fullPrompt = `${contextPrompt}
+
+Question: ${prompt}
+
+Please provide a helpful and informative response about this politician based on the given information. If you don't know or the information isn't provided, say so without making up details.`;
+    
+    console.log('Sending to Gemini:', fullPrompt);
+    
+    // Send the message and get the response
+    const result = await chat.sendMessage(fullPrompt);
+    const response = result.response;
+    const responseText = response.text();
+    
+    console.log('Received response from Gemini');
+    
+    res.json({ response: responseText });
+  } catch (error) {
+    console.error('Error calling Gemini API:', error);
+    res.status(500).json({ 
+      error: 'Failed to get response from Gemini API',
+      details: error.message
+    });
+  }
+}); 
