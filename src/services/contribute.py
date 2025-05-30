@@ -1,6 +1,6 @@
 import sqlite3
 from collections import defaultdict
-from candidate_functions import search_candidate, get_candidate_name
+from candidate_functions import getCandidateIdByName
 
 #VISHNU STUFF
 def get_db_connection():
@@ -100,15 +100,13 @@ def query_contributors_by_industry(candidate_id):
 
 if __name__ == "__main__":
     # Example usage
-    '''candidate_id = search_candidate('Thomas Cotton')
-
+    candidate_id = getCandidateIdByName('Barrasso')
+    print(candidate_id)
 
     if candidate_id:
         print(f"\nDetailed contribution analysis for {candidate_id}:")
-        query_contributors_by_industry(candidate_id)
-        #query_contributors(candidate_id)
-
-    print(get_candidate_name(candidate_id))'''
+        #query_contributors_by_industry(candidate_id)
+        query_contributors(candidate_id)
     
 
     
