@@ -364,12 +364,190 @@ def get_contributing_pacs_for_politician(candidate_id):
         print(f"Error getting contributing PACs for politician: {e}")
         return []
 
+def get_committee_contributions(committee_id, min_amount=1000.0, limit=50):
+    """
+    Get major contributions made by a committee to candidates.
+    
+    This function looks at the individualContributions table to find contributions
+    made by the specified committee to various candidates.
+    
+    Args:
+        committee_id (str): The committee ID to search for
+        min_amount (float): Minimum contribution amount to include (default: $1000)
+        limit (int): Maximum number of results to return (default: 50)
+        
+    Returns:
+        list: List of dictionaries containing contribution details:
+        {
+            'recipient_name': str,        # Name of the recipient (candidate/committee)
+            'recipient_id': str,          # Candidate ID of recipient
+            'amount': float,              # Contribution amount
+            'transaction_date': str,      # Date of transaction
+            'transaction_type': str,      # Type of transaction
+            'entity_type': str,           # Entity type
+            'city': str,                  # Recipient city
+            'state': str,                 # Recipient state
+            'year': int                   # Year of contribution
+        }
+        
+    Examples:
+        >>> get_committee_contributions('C00000059')
+        [{'recipient_name': 'BOOZMAN FOR ARKANSAS', 'amount': 5000.0, ...}]
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get contributions made by this committee
+        cursor.execute('''
+            SELECT name, cand_id, transaction_amt, transaction_dt, 
+                   transaction_tp, entity_tp, city, state, year
+            FROM individualContributions
+            WHERE cmte_id = ? AND transaction_amt >= ?
+            ORDER BY transaction_amt DESC, transaction_dt DESC
+            LIMIT ?
+        ''', (committee_id, min_amount, limit))
+        
+        results = cursor.fetchall()
+        contributions = []
+        
+        for name, cand_id, amount, trans_dt, trans_tp, entity_tp, city, state, year in results:
+            contributions.append({
+                'recipient_name': name or '',
+                'recipient_id': cand_id or '',
+                'amount': amount,
+                'transaction_date': trans_dt or '',
+                'transaction_type': trans_tp or '',
+                'entity_type': entity_tp or '',
+                'city': city or '',
+                'state': state or '',
+                'year': year
+            })
+        
+        conn.close()
+        return contributions
+        
+    except Exception as e:
+        print(f"Error getting committee contributions: {e}")
+        return []
+
+def get_committee_contribution_summary(committee_id):
+    """
+    Get a summary of contributions made by a committee.
+    
+    Args:
+        committee_id (str): The committee ID to analyze
+        
+    Returns:
+        dict: Summary statistics:
+        {
+            'total_contributions': int,
+            'total_amount': float,
+            'average_amount': float,
+            'years_active': list,
+            'top_recipients': list,
+            'contribution_by_year': dict,
+            'contribution_by_state': dict
+        }
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get basic statistics
+        cursor.execute('''
+            SELECT COUNT(*) as count, SUM(transaction_amt) as total, 
+                   AVG(transaction_amt) as average
+            FROM individualContributions
+            WHERE cmte_id = ?
+        ''', (committee_id,))
+        
+        stats = cursor.fetchone()
+        total_contributions, total_amount, average_amount = stats if stats else (0, 0.0, 0.0)
+        
+        # Get years active
+        cursor.execute('''
+            SELECT DISTINCT year
+            FROM individualContributions
+            WHERE cmte_id = ?
+            ORDER BY year
+        ''', (committee_id,))
+        
+        years_active = [row[0] for row in cursor.fetchall()]
+        
+        # Get top recipients
+        cursor.execute('''
+            SELECT name, SUM(transaction_amt) as total_amount, COUNT(*) as count
+            FROM individualContributions
+            WHERE cmte_id = ?
+            GROUP BY name
+            ORDER BY total_amount DESC
+            LIMIT 10
+        ''', (committee_id,))
+        
+        top_recipients = []
+        for name, amount, count in cursor.fetchall():
+            top_recipients.append({
+                'name': name,
+                'total_amount': amount,
+                'contribution_count': count
+            })
+        
+        # Get contributions by year
+        cursor.execute('''
+            SELECT year, SUM(transaction_amt) as total_amount, COUNT(*) as count
+            FROM individualContributions
+            WHERE cmte_id = ?
+            GROUP BY year
+            ORDER BY year
+        ''', (committee_id,))
+        
+        contribution_by_year = {}
+        for year, amount, count in cursor.fetchall():
+            contribution_by_year[year] = {
+                'total_amount': amount,
+                'count': count
+            }
+        
+        # Get contributions by state
+        cursor.execute('''
+            SELECT state, SUM(transaction_amt) as total_amount, COUNT(*) as count
+            FROM individualContributions
+            WHERE cmte_id = ? AND state != ''
+            GROUP BY state
+            ORDER BY total_amount DESC
+            LIMIT 10
+        ''', (committee_id,))
+        
+        contribution_by_state = {}
+        for state, amount, count in cursor.fetchall():
+            contribution_by_state[state] = {
+                'total_amount': amount,
+                'count': count
+            }
+        
+        conn.close()
+        
+        return {
+            'total_contributions': total_contributions or 0,
+            'total_amount': total_amount or 0.0,
+            'average_amount': average_amount or 0.0,
+            'years_active': years_active,
+            'top_recipients': top_recipients,
+            'contribution_by_year': contribution_by_year,
+            'contribution_by_state': contribution_by_state
+        }
+        
+    except Exception as e:
+        print(f"Error getting committee contribution summary: {e}")
+        return {}
+
 # Example usage and testing
 if __name__ == "__main__":
     from candidate_functions import getCandidateIdByName
     
     # Test with a candidate
-    test_candidate = 'Pelosi'
+    test_candidate = 'Biden'
     candidate_id = getCandidateIdByName(test_candidate)
     
     if candidate_id:
@@ -424,5 +602,73 @@ if __name__ == "__main__":
                 print()
         else:
             print("  No contributing PACs found for this politician")
+        
+        # Test new committee contribution functions
+        if committees:
+            test_committee_id = committees[0][0]  # Use first committee
+            print(f"\n5. Testing committee contributions for {test_committee_id}:")
+            
+            # Get committee contributions
+            contributions = get_committee_contributions(test_committee_id, min_amount=1000.0, limit=10)
+            if contributions:
+                print(f"  Found {len(contributions)} major contributions:")
+                for contrib in contributions[:5]:  # Show first 5
+                    print(f"    ${contrib['amount']:,.2f} to {contrib['recipient_name']} ({contrib['year']})")
+                    if contrib['recipient_id']:
+                        print(f"      Recipient ID: {contrib['recipient_id']}")
+                    print(f"      Location: {contrib['city']}, {contrib['state']}")
+                    print()
+            else:
+                print("  No major contributions found for this committee")
+            
+            # Get committee contribution summary
+            print(f"\n6. Contribution summary for {test_committee_id}:")
+            summary = get_committee_contribution_summary(test_committee_id)
+            if summary:
+                print(f"  Total Contributions: {summary['total_contributions']}")
+                print(f"  Total Amount: ${summary['total_amount']:,.2f}")
+                print(f"  Average Amount: ${summary['average_amount']:,.2f}")
+                print(f"  Years Active: {summary['years_active']}")
+                
+                if summary['top_recipients']:
+                    print(f"  Top Recipients:")
+                    for recipient in summary['top_recipients'][:3]:
+                        print(f"    {recipient['name']}: ${recipient['total_amount']:,.2f} ({recipient['contribution_count']} contributions)")
+                
+                if summary['contribution_by_year']:
+                    print(f"  Contributions by Year:")
+                    for year, data in summary['contribution_by_year'].items():
+                        print(f"    {year}: ${data['total_amount']:,.2f} ({data['count']} contributions)")
+            else:
+                print("  No contribution summary available")
     else:
         print(f"No candidate found for: {test_candidate}")
+    
+    # Test with a known active committee
+    print(f"\n\n=== Testing with a known active committee ===")
+    test_committee_id = 'C00000059'  # We know this one has data
+    
+    print(f"\nTesting committee {test_committee_id}:")
+    
+    # Get committee details
+    details = get_committee_details(test_committee_id)
+    if details:
+        print(f"Committee Name: {details['cmte_nm']}")
+        print(f"Type: {get_committee_type_description(details['cmte_tp'])}")
+        print(f"Is PAC: {details['is_pac']}")
+        print(f"Is Corporate PAC: {details['is_corporate_pac']}")
+    
+    # Get contributions
+    contributions = get_committee_contributions(test_committee_id, min_amount=1000.0, limit=10)
+    print(f"\nMajor contributions (${1000}+):")
+    for contrib in contributions:
+        print(f"  ${contrib['amount']:,.2f} to {contrib['recipient_name']} ({contrib['year']})")
+        print(f"    Date: {contrib['transaction_date']}, Type: {contrib['transaction_type']}")
+    
+    # Get summary
+    summary = get_committee_contribution_summary(test_committee_id)
+    if summary:
+        print(f"\nSummary:")
+        print(f"  Total: ${summary['total_amount']:,.2f} across {summary['total_contributions']} contributions")
+        print(f"  Average: ${summary['average_amount']:,.2f}")
+        print(f"  Years: {summary['years_active']}")
