@@ -7,44 +7,62 @@ import {
 import { SearchIcon } from '@chakra-ui/icons';
 import { Link } from 'react-router-dom';
 
-interface Senator {
+interface Congressman {
   id: number;
   name: string;
   state: string;
   party: string;
   chamber: string;
-  image: string; 
+  image: string;
+  congress: number;
 }
 
+// Helper function to format congressman name
+const formatCongressmanName = (name: string): string => {
+  // Check if the name contains a comma
+  if (name.includes(',')) {
+    const [lastName, firstName] = name.split(',').map(part => part.trim());
+    return `${firstName} ${lastName}`;
+  }
+  return name;
+};
+
+// Helper function to format party name
+const formatParty = (party: string): string => {
+  const partyLower = party.toLowerCase();
+  if (partyLower.includes('republican')) return 'R';
+  if (partyLower.includes('democrat')) return 'D';
+  return party;
+};
+
 const Profile = () => {
-  const [senators, setSenators] = useState<Senator[]>([]);
+  const [congressmen, setCongressmen] = useState<Congressman[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    const fetchSenators = async () => {
+    const fetchCongressmen = async () => {
       try {
         const response = await fetch('http://localhost:3001/api/members');
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
   
-        const data: Senator[] = await response.json();
-        console.log('Fetched senators data:', data); // Add this line to see the data
-        setSenators(data);
+        const data: Congressman[] = await response.json();
+        console.log('Fetched congressmen data:', data);
+        setCongressmen(data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch senators');
+        setError(err instanceof Error ? err.message : 'Failed to fetch congressmen');
       } finally {
         setIsLoading(false);
       }
     };
   
-    fetchSenators();
+    fetchCongressmen();
   }, []);
 
-  const filteredSenators = senators
-    .filter(s => s.chamber.toLowerCase() === 'senate')
-    .filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
-
+  const filteredCongressmen = congressmen
+    .filter(c => c.congress > 100)
+    .filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   if (isLoading) {
     return (
@@ -62,15 +80,14 @@ const Profile = () => {
     );
   }
 
-  if (!senators.length) {
+  if (!congressmen.length) {
     return (
       <Center h="100vh">
-        <Text>No senators found</Text>
+        <Text>No congressmen found</Text>
       </Center>
     );
   }
 
- 
   return (
     <Box>
       {/* Hero Banner */}
@@ -79,7 +96,7 @@ const Profile = () => {
         backgroundSize="cover"
         backgroundPosition="center"
         borderRadius="40"
-        m={6}
+        m={8}
         p={12}
         height="200px"
         position="relative"
@@ -103,7 +120,7 @@ const Profile = () => {
         align="center" 
         p={4}
         bg="gray.100"
-        m={4}
+        m={8}
         borderRadius="40"
       >
         <Box 
@@ -111,17 +128,18 @@ const Profile = () => {
           fontWeight="medium"
           fontSize="3xl"
           minW="200px"
+          letterSpacing={-1}
         >
-          Senators
+          Members of Congress
         </Box>
         
-        <Flex maxW="600px" flex={1} ml={4}>
+        <Flex maxW="600px" flex={1} m={4}>
           <InputGroup size="lg">
             <InputLeftElement pointerEvents="none">
               <SearchIcon color="gray.400" />
             </InputLeftElement>
             <Input 
-              placeholder="Search for a Senator" 
+              placeholder="Search for a Congressman" 
               bg="white" 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -137,47 +155,45 @@ const Profile = () => {
         </Flex>
       </Flex>
 
-      {/* Senators Grid */}
-      <Box bg="gray.100" mx={4} borderRadius="40" p={6}>
-      <SimpleGrid columns={{ base: 4, md: 6, lg: 8 }} spacing={4}>
-      {filteredSenators.map((senator) => (
-        <Link 
-        to={`/politician/${senator.id}`}  // Use the ID directly
-          key={senator.id}  // Use ID as key
-          style={{ textDecoration: 'none' }}
-          
-      >
-          <Box
-            borderRadius="2xl"
-            overflow="hidden"
-            boxShadow="md"
-            bg="white"
-            p={3}
-            mx="auto"
-            transition="transform 0.2s"
-            _hover={{ transform: 'scale(1.02)', boxShadow: 'lg' }}
-          >
-            <VStack>
-              <Image
-                src={`http://localhost:3001/${senator.image}`}
-                alt={senator.name}
+      {/* Congressmen Grid */}
+      <Box bg="gray.100" mx={8} borderRadius="40" p={8}>
+        <SimpleGrid columns={{ base: 4, md: 6, lg: 8 }} spacing={4}>
+          {filteredCongressmen.map((congressman) => (
+            <Link 
+              to={`/politician/${congressman.id}`}
+              key={congressman.id}
+              style={{ textDecoration: 'none' }}
+            >
+              <Box
                 borderRadius="2xl"
-                boxSize="100px"
-                objectFit="cover"
-                fallbackSrc="https://i.imgur.com/VlKTQWO.png"
-              />
-              <Text fontWeight="bold" textAlign="center" fontSize="sm">
-                {senator.name}
-              </Text>
-              <Text fontSize="xs" color="gray.600">
-                {senator.party} - {senator.state}
-              </Text>
-              
-            </VStack>
-          </Box>
-        </Link>
-      ))}
-    </SimpleGrid>
+                overflow="hidden"
+                boxShadow="md"
+                bg="white"
+                p={3}
+                mx="auto"
+                transition="transform 0.2s"
+                _hover={{ transform: 'scale(1.02)', boxShadow: 'lg' }}
+              >
+                <VStack>
+                  <Image
+                    src={`http://localhost:3001/${congressman.image}`}
+                    alt={congressman.name}
+                    borderRadius="2xl"
+                    boxSize="100px"
+                    objectFit="cover"
+                    fallbackSrc="https://i.imgur.com/VlKTQWO.png"
+                  />
+                  <Text fontWeight="bold" textAlign="center" fontSize="sm">
+                    {formatCongressmanName(congressman.name)}
+                  </Text>
+                  <Text fontSize="xs" color="gray.600">
+                    {formatParty(congressman.party)} - {congressman.state}
+                  </Text>
+                </VStack>
+              </Box>
+            </Link>
+          ))}
+        </SimpleGrid>
       </Box>
     </Box>
   );

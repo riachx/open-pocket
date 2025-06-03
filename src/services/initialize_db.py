@@ -39,12 +39,27 @@ def init_db():
 
         
         c.execute('''
-        CREATE TABLE IF NOT EXISTS senators (
+        CREATE TABLE IF NOT EXISTS congressmen (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT,
             state TEXT,
             party TEXT,
             chamber TEXT,
+            congress INTEGER,
+            image TEXT
+        )
+        ''')
+
+        # Drop and recreate the table to ensure schema is correct
+        c.execute('DROP TABLE IF EXISTS congressmen')
+        c.execute('''
+        CREATE TABLE congressmen (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            state TEXT,
+            party TEXT,
+            chamber TEXT,
+            congress INTEGER,
             image TEXT
         )
         ''')
@@ -57,29 +72,30 @@ def init_db():
                 state = row['state']
                 party = row['party']
                 chamber = row['chamber']
-                # You can derive image filename from name or member id
+                congress = row['congress']
                 image = row['image']
+                
 
                 c.execute('''
-                    INSERT OR IGNORE INTO senators (name, state, party, chamber, image)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (name, state, party, chamber, image))
+                    INSERT OR IGNORE INTO congressmen (name, state, party, congress, chamber, image)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (name, state, party, congress, chamber, image))
         
         c.execute('''
             
-            DELETE FROM senators
+            DELETE FROM congressmen
             WHERE rowid NOT IN (
             SELECT MIN(rowid)
-            FROM senators
+            FROM congressmen
             GROUP BY name, state, party, chamber
             );
             
                   ''')
         
-        c.execute('''DELETE FROM senators
+        c.execute('''DELETE FROM congressmen
             WHERE rowid NOT IN (
             SELECT MIN(rowid)
-            FROM senators
+            FROM congressmen
             GROUP BY name, state
             );''')
         

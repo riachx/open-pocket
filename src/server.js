@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import sqlite3 from 'sqlite3';
@@ -6,16 +7,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import fs from 'fs';
-// Import the Google AI SDK
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Initialize Google AI with your API key
-// Get your API key from https://makersuite.google.com/app/apikey
-const API_KEY = 'KEY'; // Replace with your actual API key
-const genAI = new GoogleGenerativeAI(API_KEY);
 
 const app = express();
 
@@ -54,9 +49,9 @@ app.get('/api/members', async (req, res) => {
     console.log('Database connection established');
 
     // Add logging to see what's in the database
-    console.log('Executing query to get senators');
-    const members = await db.all('SELECT id, name, state, party, chamber, image FROM senators'); 
-    console.log(`Found ${members.length} senators in database`);
+    console.log('Executing query to get congressmen');
+    const members = await db.all('SELECT id, name, state, party, chamber, congress, image FROM congressmen'); 
+    console.log(`Found ${members.length} congressmen in database`);
     console.log('First member:', members[0]);
 
     res.json(members);
@@ -220,43 +215,44 @@ app.get('/api/senators', async (req, res) => {
 });
 */
 // Add this new endpoint
-app.get('/api/senator/:id', async (req, res) => {
+app.get('/api/congressman/:id', async (req, res) => {
   let db;
   try {
     const { id } = req.params;
-    console.log('Fetching senator with ID:', id);
+    console.log('Fetching congressman with ID:', id);
     
     db = await setupDatabase();
     
     // Add logging to see the query result
-    const senator = await db.get(
-      'SELECT id, name, state, party, chamber, image FROM senators WHERE id = ?',
+    const congressman = await db.get(
+      'SELECT id, name, state, party, chamber, congress, image FROM congressmen WHERE id = ?',
       [id]
     );
     
-    console.log('Found senator:', senator); // Add this logging
+    console.log('Found congressman:', congressman);
     
-    if (!senator) {
-      console.log('Senator not found in database');
-      return res.status(404).json({ error: 'Senator not found' });
+    if (!congressman) {
+      console.log('Congressman not found in database');
+      return res.status(404).json({ error: 'Congressman not found' });
     }
     
-    // Format the response to match the Senator interface
-    const formattedSenator = {
-      id: senator.id,
-      name: senator.name,
-      state: senator.state,
-      party: senator.party,
-      chamber: senator.chamber,
-      image: senator.image
+    // Format the response to match the Congressman interface
+    const formattedCongressman = {
+      id: congressman.id,
+      name: congressman.name,
+      state: congressman.state,
+      party: congressman.party,
+      chamber: congressman.chamber,
+      image: congressman.image,
+      congress: congressman.congress,
     };
     
-    console.log('Sending formatted senator:', formattedSenator); // Add this logging
-    res.json(formattedSenator);
+    console.log('Sending formatted congressman:', formattedCongressman);
+    res.json(formattedCongressman);
   } catch (error) {
-    console.error('Error fetching senator:', error);
+    console.error('Error fetching congressman:', error);
     res.status(500).json({ 
-      error: 'Failed to fetch senator', 
+      error: 'Failed to fetch congressman', 
       details: error.message 
     });
   } finally {
@@ -300,76 +296,76 @@ app.get('/api/industry-contributions/:industry', async (req, res) => {
         contributorsFromCommittees cc 
       WHERE 
         (${whereClauses})
-        AND cc.entity_type != 'IND' -- Skip individual contributors (from contribute.py)
+        AND cc.entity_type != 'IND' -- Skip individual contributors
     `;
     
     console.log('Fetching all industry contributions');
     const industryContributions = await db.all(contributionsQuery, params);
     
-    // Group by senator and sum amounts
-    const senatorContributions = {};
+    // Group by congressman and sum amounts
+    const congressmanContributions = {};
     
     for (const contribution of industryContributions) {
       const { candidate_id, contributor_name, amount } = contribution;
       
-      if (!senatorContributions[candidate_id]) {
-        senatorContributions[candidate_id] = {
+      if (!congressmanContributions[candidate_id]) {
+        congressmanContributions[candidate_id] = {
           candidate_id,
           total: 0,
           contributors: {}
         };
       }
       
-      senatorContributions[candidate_id].total += amount;
+      congressmanContributions[candidate_id].total += amount;
       
       // Track top contributors
-      if (!senatorContributions[candidate_id].contributors[contributor_name]) {
-        senatorContributions[candidate_id].contributors[contributor_name] = 0;
+      if (!congressmanContributions[candidate_id].contributors[contributor_name]) {
+        congressmanContributions[candidate_id].contributors[contributor_name] = 0;
       }
-      senatorContributions[candidate_id].contributors[contributor_name] += amount;
+      congressmanContributions[candidate_id].contributors[contributor_name] += amount;
     }
     
     // Convert to array and sort by total amount
-    const sortedSenators = Object.values(senatorContributions)
+    const sortedCongressmen = Object.values(congressmanContributions)
       .sort((a, b) => b.total - a.total)
-      .slice(0, 20); // Top 20 senators
+      .slice(0, 20); // Top 20 congressmen
     
-    // Get senator details from the candidates table first, then senate table as fallback
+    // Get congressman details from the candidates table first, then congressmen table as fallback
     const results = [];
     
-    for (const senator of sortedSenators) {
+    for (const congressman of sortedCongressmen) {
       try {
         // Always try to get candidate name from candidates table first
         const candidateInfo = await db.get(
           'SELECT CAND_NAME as name, PTY_CD, CAND_PTY_AFFILIATION, CAND_OFFICE_ST as state FROM candidates WHERE CAND_ID = ?',
-          senator.candidate_id
+          congressman.candidate_id
         );
         
         // Find top contributor
-        const topContributor = Object.entries(senator.contributors)
+        const topContributor = Object.entries(congressman.contributors)
           .sort((a, b) => b[1] - a[1])[0];
         
         if (candidateInfo) {
-          console.log(`Found candidate ${senator.candidate_id} in candidates table`);
+          console.log(`Found candidate ${congressman.candidate_id} in candidates table`);
           
           results.push({
             name: candidateInfo.name,
             party: getFullPartyName(candidateInfo.PTY_CD, candidateInfo.CAND_PTY_AFFILIATION),
             state: candidateInfo.state,
             contributor_name: topContributor ? topContributor[0] : 'Unknown',
-            amount: senator.total,
-            candidate_id: senator.candidate_id // Include the ID for lookups
+            amount: congressman.total,
+            candidate_id: congressman.candidate_id
           });
         } else {
           // Fallback if not found in candidates table - try the candidates_master table
-          console.log(`Looking up name in candidates_master for ID: ${senator.candidate_id}`);
+          console.log(`Looking up name in candidates_master for ID: ${congressman.candidate_id}`);
           
           const masterCandidate = await db.get(
             'SELECT CAND_NAME, CAND_PTY_AFFILIATION FROM candidates_master WHERE CAND_ID = ?',
-            [senator.candidate_id]
+            [congressman.candidate_id]
           );
           
-          console.log(`candidates_master query result for ${senator.candidate_id}:`, masterCandidate);
+          console.log(`candidates_master query result for ${congressman.candidate_id}:`, masterCandidate);
           
           if (masterCandidate && masterCandidate.CAND_NAME) {
             results.push({
@@ -377,35 +373,35 @@ app.get('/api/industry-contributions/:industry', async (req, res) => {
               party: getFullPartyName(null, masterCandidate.CAND_PTY_AFFILIATION),
               state: 'Unknown',
               contributor_name: topContributor ? topContributor[0] : 'Unknown',
-              amount: senator.total,
-              candidate_id: senator.candidate_id
+              amount: congressman.total,
+              candidate_id: congressman.candidate_id
             });
           } else {
             // If still not found, use the direct SQL query as last resort
-            const candidateNameQuery = `SELECT CAND_NAME FROM candidates WHERE CAND_ID = '${senator.candidate_id}'`;
+            const candidateNameQuery = `SELECT CAND_NAME FROM candidates WHERE CAND_ID = '${congressman.candidate_id}'`;
             const candidateName = await db.get(candidateNameQuery);
             
             results.push({
-              name: candidateName && candidateName.CAND_NAME ? candidateName.CAND_NAME : `Candidate ${senator.candidate_id}`,
+              name: candidateName && candidateName.CAND_NAME ? candidateName.CAND_NAME : `Candidate ${congressman.candidate_id}`,
               party: 'Unknown',
               state: 'Unknown',
               contributor_name: topContributor ? topContributor[0] : 'Unknown',
-              amount: senator.total,
-              candidate_id: senator.candidate_id
+              amount: congressman.total,
+              candidate_id: congressman.candidate_id
             });
           }
         }
       } catch (error) {
-        console.error(`Error processing candidate ${senator.candidate_id}:`, error);
+        console.error(`Error processing candidate ${congressman.candidate_id}:`, error);
         
         // Error fallback
-        const topContributor = Object.entries(senator.contributors)
+        const topContributor = Object.entries(congressman.contributors)
           .sort((a, b) => b[1] - a[1])[0];
         
         // Try to get the name from candidates_master first
         const masterCandidate = await db.get(
           'SELECT CAND_NAME, CAND_PTY_AFFILIATION FROM candidates_master WHERE CAND_ID = ?',
-          [senator.candidate_id]
+          [congressman.candidate_id]
         );
         
         if (masterCandidate && masterCandidate.CAND_NAME) {
@@ -414,27 +410,27 @@ app.get('/api/industry-contributions/:industry', async (req, res) => {
             party: getFullPartyName(null, masterCandidate.CAND_PTY_AFFILIATION),
             state: 'Unknown',
             contributor_name: topContributor ? topContributor[0] : 'Unknown',
-            amount: senator.total,
-            candidate_id: senator.candidate_id
+            amount: congressman.total,
+            candidate_id: congressman.candidate_id
           });
         } else {
           // Fall back to the existing approach
-          const candidateNameQuery = `SELECT CAND_NAME FROM candidates WHERE CAND_ID = '${senator.candidate_id}'`;
+          const candidateNameQuery = `SELECT CAND_NAME FROM candidates WHERE CAND_ID = '${congressman.candidate_id}'`;
           const candidateName = await db.get(candidateNameQuery);
           
           results.push({
-            name: candidateName && candidateName.CAND_NAME ? candidateName.CAND_NAME : `Candidate ${senator.candidate_id}`,
+            name: candidateName && candidateName.CAND_NAME ? candidateName.CAND_NAME : `Candidate ${congressman.candidate_id}`,
             party: 'Unknown',
             state: 'Unknown',
             contributor_name: topContributor ? topContributor[0] : 'Unknown',
-            amount: senator.total,
-            candidate_id: senator.candidate_id
+            amount: congressman.total,
+            candidate_id: congressman.candidate_id
           });
         }
       }
     }
     
-    console.log(`Found ${results.length} senators who received ${industry} contributions`);
+    console.log(`Found ${results.length} congressmen who received ${industry} contributions`);
     res.json(results);
     
   } catch (error) {
@@ -496,7 +492,7 @@ app.get('/api/candidate/name/:candidateId', async (req, res) => {
   }
 });
 
-// New endpoint to get candidate information from our database
+// Add endpoint to get candidate information from our database
 app.get('/api/candidate-info/:candidateId', async (req, res) => {
   let db;
   try {
@@ -548,19 +544,19 @@ app.get('/api/candidate-info/:candidateId', async (req, res) => {
       });
     }
     
-    // If not found in candidates_master, try senate table as backup
-    const senatorData = await db.get(
-      'SELECT id, name, party, state FROM senate WHERE id = ?',
+    // If not found in candidates_master, try congressmen table as backup
+    const congressmanData = await db.get(
+      'SELECT id, name, party, state FROM congressmen WHERE id = ?',
       candidateId
     );
     
-    if (senatorData) {
-      console.log(`Found candidate ${candidateId} in senate table`);
+    if (congressmanData) {
+      console.log(`Found candidate ${candidateId} in congressmen table`);
       return res.json({
-        id: senatorData.id,
-        name: senatorData.name,
-        party: senatorData.party,
-        state: senatorData.state
+        id: congressmanData.id,
+        name: congressmanData.name,
+        party: congressmanData.party,
+        state: congressmanData.state
       });
     }
     
@@ -1178,78 +1174,41 @@ app.get('/api/tim-scott-debug', async (req, res) => {
   }
 });
 
-// Gemini AI Chat endpoint
-app.post('/api/gemini-chat', async (req, res) => {
+// Add chat endpoint
+app.post('/api/chat', async (req, res) => {
   try {
-    const { prompt, context, history } = req.body;
+    const { message } = req.body;
     
-    if (!prompt) {
-      return res.status(400).json({ error: 'Missing prompt in request body' });
+    if (!process.env.GOOGLE_API_KEY) {
+      throw new Error('GOOGLE_API_KEY is not set in environment variables');
     }
     
-    console.log('Received chat request:', { prompt, context });
+    // Initialize the Google AI client
+    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-04-17" });
     
-    // Get the Gemini Pro model
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-    
-    // Create a chat session
-    const chat = model.startChat({
-      history: history.map(msg => ({
-        role: msg.role,
-        parts: [{ text: msg.content }]
-      })),
-      generationConfig: {
-        maxOutputTokens: 2048,
-        temperature: 0.7,
-      },
-    });
-    
-    // Format contextual information about the senator for the model
-    let contextPrompt = '';
-    if (context && context.senator) {
-      contextPrompt = `
-Here's information about the politician:
-- Name: ${context.senator.name}
-- Party: ${context.senator.party}
-- State: ${context.senator.state}
 
-Total campaign contributions: ${new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD'
-}).format(context.totalContributions || 0)}
+    const plainTextPrompt = `Respond in plain text only. Do not use markdown formatting like asterisks (*), bold (**), or bullet points. \n\n${message}`;
 
-Top contributors: ${context.committees && context.committees.length > 0 ? 
-  context.committees.slice(0, 5).map(comm => 
-    `${comm.name} (${new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(comm.total_amount)})`
-  ).join(', ') : 'No committee data available'}
-`;
-    }
     
-    // Combine the context and user's question
-    const fullPrompt = `${contextPrompt}
+    // Process the message
+    const result = await model.generateContent(plainTextPrompt);
+    const response = await result.response;
+    const text = response.text();
+    
 
-Question: ${prompt}
-
-Please provide a helpful and informative response about this politician based on the given information. If you don't know or the information isn't provided, say so without making up details.`;
     
-    console.log('Sending to Gemini:', fullPrompt);
-    
-    // Send the message and get the response
-    const result = await chat.sendMessage(fullPrompt);
-    const response = result.response;
-    const responseText = response.text();
-    
-    console.log('Received response from Gemini');
-    
-    res.json({ response: responseText });
+    res.json({ response: text });
   } catch (error) {
-    console.error('Error calling Gemini API:', error);
+    console.error('Error in chat endpoint:', error);
     res.status(500).json({ 
-      error: 'Failed to get response from Gemini API',
-      details: error.message
+      error: 'Failed to process chat message',
+      details: error.message 
     });
   }
+});
+
+// Add GET /api/chat for helpful error message
+app.get('/api/chat', (req, res) => {
+  res.status(405).json({ error: 'Please use POST with a JSON body { message } to interact with the chat endpoint.' });
 }); 
