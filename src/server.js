@@ -992,12 +992,13 @@ async function setupCandidatesMasterTable() {
     
     // File paths for candidate data
     const candidateFiles = [
-      './assets/data/cand/cn-21.txt',
-      './assets/data/cand/cn-23.txt'
+      '../assets/data/candidate-masters/cn.txt',
+      '../assets/data/candidate-masters/cn 2.txt',
+      '../assets/data/candidate-masters/cn 3.txt'
     ];
     
     // Read the header file to get column indices
-    const headerPath = path.resolve(__dirname, './assets/data/cand/cn_header_file.csv');
+    const headerPath = path.resolve(__dirname, '../assets/data/candidate-masters/cn_header_file.csv');
     console.log('Looking for header file at:', headerPath);
     
     if (!fs.existsSync(headerPath)) {

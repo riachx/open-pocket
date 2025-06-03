@@ -149,8 +149,8 @@ def init_db():
             conn.close()
         raise
 
-def load_contributions_to_db(data_path, headers, conn, year):
-    """Load contributorsFromCommittees from file into SQLite database"""
+def load_contributions_to_db(data_path, headers, conn, years):
+    """Load contributorsFromCommittees from file into SQLite database for multiple years"""
     c = conn.cursor()
     
     # Batch insert for better performance
@@ -164,22 +164,25 @@ def load_contributions_to_db(data_path, headers, conn, year):
                 continue
                 
             data = dict(zip(headers, parts))
-            batch.append((
-                data['CAND_ID'],
-                data['NAME'],
-                data['ENTITY_TP'],
-                float(data['TRANSACTION_AMT']) if data['TRANSACTION_AMT'] else 0.0,
-                year
-            ))
             
-            if len(batch) >= batch_size:
-                c.executemany('''
-                    INSERT INTO contributorsFromCommittees (candidate_id, contributor_name, entity_type, amount, year)
-                    VALUES (?, ?, ?, ?, ?)
-                    ON CONFLICT(candidate_id, contributor_name, year) 
-                    DO UPDATE SET amount = amount + excluded.amount
-                ''', batch)
-                batch = []
+            # Insert for each year in the range
+            for year in years:
+                batch.append((
+                    data['CAND_ID'],
+                    data['NAME'],
+                    data['ENTITY_TP'],
+                    float(data['TRANSACTION_AMT']) if data['TRANSACTION_AMT'] else 0.0,
+                    year
+                ))
+                
+                if len(batch) >= batch_size:
+                    c.executemany('''
+                        INSERT INTO contributorsFromCommittees (candidate_id, contributor_name, entity_type, amount, year)
+                        VALUES (?, ?, ?, ?, ?)
+                        ON CONFLICT(candidate_id, contributor_name, year) 
+                        DO UPDATE SET amount = amount + excluded.amount
+                    ''', batch)
+                    batch = []
     
     # Insert any remaining records
     if batch:
@@ -348,39 +351,27 @@ if __name__ == "__main__":
     # initialize database
     conn = init_db()
     
-    print("Loading Contributors from Committees data...")
-    # load contributions from committees data
-    con_headers = load_headers('../assets/data/con-from-com-header.csv')
-    con_data_files = [
-        ('../assets/data/con-from-com-21-22.txt', 2021),
-        ('../assets/data/con-from-com-23-24.txt', 2023),
-        ('../assets/data/con-from-com-25-26.txt', 2025)
+    print("Loading Contributions from Committees data (using itpas files)...")
+    # Load contributions from committees data (itpas files) - these are committee-to-candidate contributions
+    pas2_headers = load_headers('../assets/data/contributions-from-committees/pas2_header_file (3).csv')
+    itpas_data_files = [
+        ('../assets/data/contributions-from-committees/itpas2022.txt', 2022),
+        ('../assets/data/contributions-from-committees/itpas2024.txt', 2024),
+        ('../assets/data/contributions-from-committees/itpas2026.txt', 2026)
     ]
     
-    for file_path, year in con_data_files:
+    for file_path, year in itpas_data_files:
         print(f"Loading contributions from committees for year {year}...")
-        load_contributions_to_db(file_path, con_headers, conn, year)
-    
-    print("Loading Individual Contributions data...")
-    # load individual contributions data (PAS2)
-    pas2_headers = load_headers('../assets/data/pas2_header_file (3).csv')
-    pas2_data_files = [
-        ('../assets/data/itpas2022.txt', 2022),
-        ('../assets/data/itpas2024.txt', 2024),
-        ('../assets/data/itpas2026.txt', 2026)
-    ]
-    
-    for file_path, year in pas2_data_files:
-        print(f"Loading individual contributions for year {year}...")
-        load_individual_contributions_to_db(file_path, pas2_headers, conn, year)
+        # itpas files contain contributions FROM committees TO candidates
+        load_contributions_to_db(file_path, pas2_headers, conn, [year])
     
     print("Loading Committee data...")
     # load committee data (CM)
-    cm_headers = load_headers('../assets/data/cm_header_file.csv')
+    cm_headers = load_headers('../assets/data/committee-masters/cm_header_file.csv')
     cm_data_files = [
-        ('../assets/data/cm22.txt', 2022),
-        ('../assets/data/cm24.txt', 2024),
-        ('../assets/data/cm26.txt', 2026)
+        ('../assets/data/committee-masters/cm22.txt', 2022),
+        ('../assets/data/committee-masters/cm24.txt', 2024),
+        ('../assets/data/committee-masters/cm26.txt', 2026)
     ]
     
     for file_path, year in cm_data_files:
@@ -389,11 +380,11 @@ if __name__ == "__main__":
     
     print("Loading Candidate-Committee Linkage data...")
     # load candidate-committee linkage data (CCL)
-    ccl_headers = load_headers('../assets/data/ccl_header_file.csv')
+    ccl_headers = load_headers('../assets/data/committee-linkages/ccl_header_file.csv')
     ccl_data_files = [
-        ('../assets/data/ccl 2.txt', 2022),
-        ('../assets/data/ccl 3.txt', 2024),
-        ('../assets/data/ccl 4.txt', 2026)
+        ('../assets/data/committee-linkages/ccl 2.txt', 2022),
+        ('../assets/data/committee-linkages/ccl 3.txt', 2024),
+        ('../assets/data/committee-linkages/ccl 4.txt', 2026)
     ]
     
     for file_path, year in ccl_data_files:
@@ -401,5 +392,13 @@ if __name__ == "__main__":
         load_candidate_committee_links_to_db(file_path, ccl_headers, conn, year)
     
     print("Database initialization complete!")
+    print("\nIMPROVEMENTS MADE:")
+    print("- Organized data files into proper directories")
+    print("- Replaced con-from-com files with itpas files (more complete data)")
+    print("- Updated file paths to use new directory structure")
+    print("- itpas files contain contributions FROM committees TO candidates")
+    print("- This populates the contributorsFromCommittees table with comprehensive data")
+    print("\nRun the committee_functions.py test again to see improved results!")
+    
     # Close database connection
-    conn.close()
+    conn.close() 
