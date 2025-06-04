@@ -13,7 +13,7 @@ def init_db():
     """Initialize the SQLite database and create necessary tables"""
     try:
         # close any existing connections
-        conn = sqlite3.connect('politicaldata.db', timeout=20)
+        conn = sqlite3.connect('/Volumes/Extreme SSD/OpenPockets/politicaldata.db', timeout=20)
         c = conn.cursor()
         
         # drop existing tables to recreate with new schema
@@ -21,6 +21,7 @@ def init_db():
         c.execute('DROP TABLE IF EXISTS individualContributions')
         c.execute('DROP TABLE IF EXISTS committees')
         c.execute('DROP TABLE IF EXISTS candidateCommitteeLinks')
+        c.execute('DROP TABLE IF EXISTS linkedin_companies')
         
         # Create table for contributions from committees
         c.execute('''
@@ -87,6 +88,26 @@ def init_db():
                 PRIMARY KEY (cand_id, cmte_id, cand_election_yr)
             )
         ''')
+
+        # Create LinkedIn companies table (updated schema to match balanced loader)
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS linkedin_companies (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                handle TEXT,
+                name TEXT,
+                domain TEXT,
+                website TEXT,
+                industry TEXT,
+                size TEXT,
+                size_priority INTEGER,
+                type TEXT,
+                founded TEXT,
+                city TEXT,
+                state TEXT,
+                country_code TEXT,
+                relevance_score INTEGER
+            )
+        ''')
         
         # Create indexes for faster queries
         c.execute('CREATE INDEX IF NOT EXISTS idx_candidate ON contributorsFromCommittees(candidate_id)')
@@ -94,6 +115,11 @@ def init_db():
         c.execute('CREATE INDEX IF NOT EXISTS idx_committee_id ON committees(cmte_id)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_ccl_cand ON candidateCommitteeLinks(cand_id)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_ccl_cmte ON candidateCommitteeLinks(cmte_id)')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_company_name ON linkedin_companies(name)')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_company_size ON linkedin_companies(size_priority)')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_company_industry ON linkedin_companies(industry)')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_company_relevance ON linkedin_companies(relevance_score)')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_company_country ON linkedin_companies(country_code)')
 
         # Create senators table
         c.execute('''
@@ -392,13 +418,15 @@ if __name__ == "__main__":
         load_candidate_committee_links_to_db(file_path, ccl_headers, conn, year)
     
     print("Database initialization complete!")
-    print("\nIMPROVEMENTS MADE:")
-    print("- Organized data files into proper directories")
-    print("- Replaced con-from-com files with itpas files (more complete data)")
-    print("- Updated file paths to use new directory structure")
-    print("- itpas files contain contributions FROM committees TO candidates")
-    print("- This populates the contributorsFromCommittees table with comprehensive data")
-    print("\nRun the committee_functions.py test again to see improved results!")
+    print("\nSUMMARY:")
+    print("- Created all necessary tables with proper schemas")
+    print("- Loaded political contribution data (committees to candidates)")
+    print("- Loaded committee master data")
+    print("- Loaded candidate-committee linkage data")
+    print("- Loaded senators/members data")
+    print("- Created LinkedIn companies table (ready for balanced loader)")
+    print("- All data indexed for optimal query performance")
+    print("\nTo load LinkedIn companies, run: python load_linkedin_companies_balanced.py")
     
     # Close database connection
     conn.close() 
