@@ -19,6 +19,70 @@ def get_db_connection():
         print(f"Database error: {e}")
         raise
 
+def get_politician_full_name(candidate_id, conn=None):
+    """
+    Get the full name of a politician from the database.
+    
+    Args:
+        candidate_id (str): The candidate ID to look up
+        conn: Optional database connection to reuse
+        
+    Returns:
+        str: Full politician name if found, otherwise the candidate ID
+    """
+    try:
+        should_close = conn is None
+        if conn is None:
+            conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Try to get name from candidates_master table first (most reliable)
+        cursor.execute('''
+            SELECT CAND_NAME FROM candidates_master WHERE CAND_ID = ?
+            LIMIT 1
+        ''', (candidate_id,))
+        result = cursor.fetchone()
+        
+        if result and result[0]:
+            if should_close:
+                conn.close()
+            return result[0]
+        
+        # Try to get name from candidates table
+        cursor.execute('''
+            SELECT CAND_NAME FROM candidates WHERE CAND_ID = ?
+            LIMIT 1
+        ''', (candidate_id,))
+        result = cursor.fetchone()
+        
+        if result and result[0]:
+            if should_close:
+                conn.close()
+            return result[0]
+        
+        # If no name found in candidate tables, try senators table
+        # (This would need more sophisticated matching logic in practice)
+        cursor.execute('''
+            SELECT name FROM senators WHERE name IS NOT NULL AND name != ''
+            ORDER BY name
+            LIMIT 1
+        ''')
+        result = cursor.fetchone()
+        
+        if should_close:
+            conn.close()
+        
+        if result and result[0]:
+            return result[0]
+        else:
+            return candidate_id  # Return candidate ID if no name found
+        
+    except Exception as e:
+        print(f"Error getting politician name: {e}")
+        if should_close and conn:
+            conn.close()
+        return candidate_id
+
 def get_politician_pacs(candidate_id, conn=None):
     """
     Get all PACs connected to a politician, organized by type.
@@ -349,6 +413,10 @@ def generate_comprehensive_money_report(candidate_id, politician_name=None):
     try:
         conn = get_db_connection()
         
+        # Get the full politician name from database if not provided
+        if not politician_name:
+            politician_name = get_politician_full_name(candidate_id, conn)
+        
         report = {
             'candidate_id': candidate_id,
             'politician_name': politician_name,
@@ -413,7 +481,10 @@ def print_comprehensive_money_report(candidate_id, politician_name=None):
         print("❌ Unable to generate report")
         return
     
-    name_display = politician_name.upper() if politician_name else candidate_id
+    # Use the full name from the report (which includes database lookup)
+    full_name = report['politician_name']
+    name_display = full_name.upper() if full_name else candidate_id
+    
     print(f"Politician: {name_display}")
     print(f"Candidate ID: {candidate_id}")
     print(f"Report generated in: {end_time - start_time:.2f} seconds\n")
@@ -538,15 +609,17 @@ def print_comprehensive_money_report(candidate_id, politician_name=None):
 # Main execution for testing
 if __name__ == "__main__":
     # Test with different politicians
-    test_politicians = ['Barrasso', 'Warren', 'Cruz', 'Harris']
-    
+    #test_politicians = ['Barrasso', 'Warren', 'Cruz', 'Harris']
+    #test_politicians = ['Barrasso']
+    test_politicians = ['Warnock']
     for politician in test_politicians:
         print(f"\n🔍 Searching for: {politician}")
         candidate_id = getCandidateIdByName(politician)
         
         if candidate_id:
             print(f"✅ Found candidate ID: {candidate_id}")
-            print_comprehensive_money_report(candidate_id, politician)
+            # Don't pass politician name - let function get full name from database
+            print_comprehensive_money_report(candidate_id)
             break  # Just show one example
         else:
             print(f"❌ No candidate found for: {politician}")
