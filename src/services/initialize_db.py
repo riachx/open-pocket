@@ -123,17 +123,36 @@ def init_db():
 
         # Create senators table
         c.execute('''
-        CREATE TABLE IF NOT EXISTS senators (
+        CREATE TABLE IF NOT EXISTS congressmen (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT,
             state TEXT,
             party TEXT,
             chamber TEXT,
-            image TEXT
+            congress INTEGER,
+            image TEXT,
+            bioguide_id TEXT,
+            fec_ids TEXT
         )
         ''')
 
-        with open("../assets/data/members.csv", newline='', encoding='utf-8') as csvfile:
+        # Drop and recreate the table to ensure schema is correct
+        c.execute('DROP TABLE IF EXISTS congressmen')
+        c.execute('''
+        CREATE TABLE congressmen (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            state TEXT,
+            party TEXT,
+            chamber TEXT,
+            congress INTEGER,
+            image TEXT,
+            bioguide_id TEXT,
+            fec_ids TEXT
+        )
+        ''')
+
+        with open("../assets/data/members-connected.csv", newline='', encoding='utf-8') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
                 # Adjust field names based on VoteView CSV columns
@@ -141,29 +160,32 @@ def init_db():
                 state = row['state']
                 party = row['party']
                 chamber = row['chamber']
-                # You can derive image filename from name or member id
+                congress = row['congress']
                 image = row['image']
+                bioguide_id = row['bioguide_id']
+                fec_ids = row['fec_ids']
+                
 
                 c.execute('''
-                    INSERT OR IGNORE INTO senators (name, state, party, chamber, image)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (name, state, party, chamber, image))
+                    INSERT OR IGNORE INTO congressmen (name, state, party, congress, chamber, image, bioguide_id, fec_ids)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (name, state, party, congress, chamber, image, bioguide_id, fec_ids))
         
         c.execute('''
             
-            DELETE FROM senators
+            DELETE FROM congressmen
             WHERE rowid NOT IN (
             SELECT MIN(rowid)
-            FROM senators
+            FROM congressmen
             GROUP BY name, state, party, chamber
             );
             
                   ''')
         
-        c.execute('''DELETE FROM senators
+        c.execute('''DELETE FROM congressmen
             WHERE rowid NOT IN (
             SELECT MIN(rowid)
-            FROM senators
+            FROM congressmen
             GROUP BY name, state
             );''')
         
