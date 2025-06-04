@@ -611,7 +611,7 @@ if __name__ == "__main__":
     # Test with different politicians
     #test_politicians = ['Barrasso', 'Warren', 'Cruz', 'Harris']
     #test_politicians = ['Barrasso']
-    test_politicians = ['Warnock']
+    test_politicians = ['Barrasso']
     for politician in test_politicians:
         print(f"\n🔍 Searching for: {politician}")
         candidate_id = getCandidateIdByName(politician)
@@ -625,5 +625,5 @@ if __name__ == "__main__":
             print(f"❌ No candidate found for: {politician}")
     
     if not any(getCandidateIdByName(p) for p in test_politicians):
-        print("\n⚠️  No test politicians found. Testing with a direct candidate ID...")
-        print_comprehensive_money_report("S4SC00240", "Unknown Politician") 
+        print("\n⚠️  No test politicians found.")
+        #print_comprehensive_money_report("S4SC00240", "Unknown Politician") 

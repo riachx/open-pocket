@@ -27,8 +27,16 @@ import {
   IconButton,
   Avatar,
   Divider,
+  Tooltip,
+  Link,
+  HStack,
+  Accordion,
+  AccordionItem,
+  AccordionButton,
+  AccordionPanel,
+  AccordionIcon,
 } from '@chakra-ui/react';
-import { ArrowBackIcon, ArrowForwardIcon } from '@chakra-ui/icons';
+import { ArrowBackIcon, ArrowForwardIcon, ExternalLinkIcon } from '@chakra-ui/icons';
 
 interface Senator {
   id: number;
@@ -39,11 +47,56 @@ interface Senator {
   image: string; 
 }
 
-interface CommitteeContribution {
+// Updated interfaces for money tracking data
+interface Committee {
+  committee_id: string;
   name: string;
-  entity_type: string;
-  total_amount: number;
-  transaction_count: number;
+  pac_type: string;
+  designation: string;
+  party_affiliation: string;
+  is_corporate_pac: boolean;
+  connected_organization?: string;
+  total_contributions: number;
+  years: number[];
+  pac_category: string;
+}
+
+interface CommitteeData {
+  totalContributions: number;
+  totalCommittees: number;
+  committees: Committee[];
+  pacsByType: {
+    traditional_pacs: Committee[];
+    super_pacs: Committee[];
+    leadership_pacs: Committee[];
+    corporate_pacs: Committee[];
+    other_committees: Committee[];
+  };
+}
+
+interface Company {
+  name: string;
+  type: string; // 'LinkedIn Company' or 'Corporate PAC Sponsor'
+  industry: string;
+  size: string;
+  website?: string;
+  location?: string;
+  country: string;
+  relevance_score?: number;
+  connection_type: string;
+  total_contributions?: number;
+}
+
+interface Industry {
+  industry: string;
+  companies: Company[];
+  totalContributions: number;
+  connectionCount: number;
+}
+
+interface IndustryData {
+  industries: Industry[];
+  corporateConnections: Company[];
 }
 
 interface Message {
@@ -55,11 +108,14 @@ const Politician = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [senator, setSenator] = useState<Senator | null>(null);
-  const [committees, setCommittees] = useState<CommitteeContribution[]>([]);
+  const [committeeData, setCommitteeData] = useState<CommitteeData | null>(null);
+  const [industryData, setIndustryData] = useState<IndustryData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingCommittees, setIsLoadingCommittees] = useState(true);
+  const [isLoadingIndustries, setIsLoadingIndustries] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [committeesError, setCommitteesError] = useState<string | null>(null);
+  const [industriesError, setIndustriesError] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [userInput, setUserInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -105,14 +161,14 @@ const Politician = () => {
   
         // Fetch the senator data
         const response = await fetch(`http://localhost:3001/api/senator/${numericId}`);
-        console.log('Response status:', response.status); // Add this logging
+        console.log('Response status:', response.status);
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
   
         const data = await response.json();
-        console.log('Received senator data:', data); // Add this logging
+        console.log('Received senator data:', data);
         
         if (!data || !data.id) {
           throw new Error('Invalid senator data received');
@@ -130,53 +186,55 @@ const Politician = () => {
     fetchSenatorDetails();
   }, [id]);
 
-  // Fetch committee contributions
+  // Fetch committee contributions using new money tracking endpoint
   useEffect(() => {
-    const fetchCommitteeContributions = async () => {
+    const fetchCommitteeData = async () => {
       if (!id) return;
       
       try {
         setIsLoadingCommittees(true);
-        console.log('Fetching committee contributions for politician ID:', id);
+        console.log('Fetching committee data for senator ID:', id);
         
-        let url = `http://localhost:3001/api/senators/${id}/committees`;
+        const response = await fetch(`http://localhost:3001/api/senator/${id}/committees`);
+        const data = await response.json();
         
-        // Special case for Tim Scott
-        if (id === '1282') {
-          console.log('Using special debug endpoint for Tim Scott');
-          url = 'http://localhost:3001/api/tim-scott-debug';
-        }
-        
-        // Use the direct endpoint for a specific senator
-        const response = await fetch(url);
-        
-        // Even if we get a 404 or 500, we'll still try to parse the response
-        // This is to handle the case where the server returns an empty array
-        const data = await response.json().catch(() => []);
         console.log('Received committee data:', data);
-        
-        // Extract contributions from debug endpoint if needed
-        const contributionsData = id === '1282' && data.contributions ? data.contributions : data;
-        
-        // Ensure we have array data
-        const contributions = Array.isArray(contributionsData) ? contributionsData : [];
-        console.log('Found committee contributions:', contributions.length);
-        
-        setCommittees(contributions);
+        setCommitteeData(data);
       } catch (err) {
-        console.error('Error fetching committee contributions:', err);
+        console.error('Error fetching committee data:', err);
         setCommitteesError(err instanceof Error ? err.message : 'Failed to fetch committee data');
-        // Don't set empty array here to avoid losing data if it was loaded successfully before
       } finally {
         setIsLoadingCommittees(false);
       }
     };
 
-    fetchCommitteeContributions();
+    fetchCommitteeData();
   }, [id]);
 
-  // Calculate total contributions
-  const totalContributions = committees.reduce((sum, committee) => sum + committee.total_amount, 0);
+  // Fetch industry data using new money tracking endpoint
+  useEffect(() => {
+    const fetchIndustryData = async () => {
+      if (!id) return;
+      
+      try {
+        setIsLoadingIndustries(true);
+        console.log('Fetching industry data for senator ID:', id);
+        
+        const response = await fetch(`http://localhost:3001/api/senator/${id}/industries`);
+        const data = await response.json();
+        
+        console.log('Received industry data:', data);
+        setIndustryData(data);
+      } catch (err) {
+        console.error('Error fetching industry data:', err);
+        setIndustriesError(err instanceof Error ? err.message : 'Failed to fetch industry data');
+      } finally {
+        setIsLoadingIndustries(false);
+      }
+    };
+
+    fetchIndustryData();
+  }, [id]);
 
   // Add a function to handle sending messages
   const handleSendMessage = async () => {
@@ -203,8 +261,8 @@ const Politician = () => {
               party: senator.party,
               state: senator.state,
             },
-            committees: committees,
-            totalContributions
+            committeeData: committeeData,
+            industryData: industryData
           },
           history: messages
         }),
@@ -238,6 +296,42 @@ const Politician = () => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
+
+  // Helper function to get badge color for PAC types
+  const getPacTypeBadgeColor = (pacType: string, isCorpoate: boolean) => {
+    if (isCorpoate) return 'orange';
+    switch (pacType) {
+      case 'N':
+      case 'Q':
+        return 'blue'; // Traditional PACs
+      case 'O':
+        return 'red'; // Super PACs
+      case 'V':
+      case 'W':
+        return 'purple'; // Leadership PACs
+      default:
+        return 'gray';
+    }
+  };
+
+  // Helper function to get PAC type display name
+  const getPacTypeDisplayName = (pacType: string, isCorpoate: boolean) => {
+    if (isCorpoate) return 'Corporate PAC';
+    switch (pacType) {
+      case 'N':
+        return 'Nonconnected PAC';
+      case 'Q':
+        return 'Qualified PAC';
+      case 'O':
+        return 'Super PAC';
+      case 'V':
+        return 'Leadership PAC';
+      case 'W':
+        return 'Leadership PAC';
+      default:
+        return pacType;
+    }
+  };
 
   if (isLoading) {
     return (
@@ -312,7 +406,7 @@ const Politician = () => {
         >
           <Flex>
           <Image
-            src={`http://localhost:3001/images/${senator.image}`}  // Make sure this matches your image path
+            src={`http://localhost:3001/images/${senator.image}`}
             alt={senator.name}
             borderRadius="2xl"
             boxSize="100px"
@@ -332,7 +426,7 @@ const Politician = () => {
         <Grid templateColumns={{ base: "1fr", lg: "1fr 1fr" }} gap={8}>
           {/* Left Column */}
           <VStack spacing={8}>
-            {/* Affiliated PACs Box */}
+            {/* Affiliated Committees Box */}
             <Box
               bg="white"
               p={6}
@@ -347,11 +441,11 @@ const Politician = () => {
               <StatGroup mb={6}>
                 <Stat>
                   <StatLabel>Total Committee Contributions</StatLabel>
-                  <StatNumber>{formatCurrency(totalContributions)}</StatNumber>
+                  <StatNumber>{formatCurrency(committeeData?.totalContributions || 0)}</StatNumber>
                 </Stat>
                 <Stat>
                   <StatLabel>Total Committees</StatLabel>
-                  <StatNumber>{committees.length}</StatNumber>
+                  <StatNumber>{committeeData?.totalCommittees || 0}</StatNumber>
                 </Stat>
               </StatGroup>
               
@@ -361,7 +455,7 @@ const Politician = () => {
                 </Center>
               ) : committeesError ? (
                 <Text color="red.500">{committeesError}</Text>
-              ) : committees.length === 0 ? (
+              ) : !committeeData || committeeData.totalCommittees === 0 ? (
                 <Flex direction="column" align="center" justify="center" p={8}>
                   <Text color="gray.500" fontSize="lg" mb={2}>No committee contributions found for this politician.</Text>
                   <Text color="gray.400" fontSize="sm">This could be because the politician is new or their data is not yet in our database.</Text>
@@ -373,19 +467,40 @@ const Politician = () => {
                       <Tr>
                         <Th>Committee Name</Th>
                         <Th>Type</Th>
+                        <Th>Party</Th>
                         <Th isNumeric>Amount</Th>
-                        <Th isNumeric>Transactions</Th>
+                        <Th>Years</Th>
                       </Tr>
                     </Thead>
                     <Tbody>
-                      {committees.map((committee, index) => (
+                      {committeeData.committees.slice(0, 10).map((committee, index) => (
                         <Tr key={index}>
-                          <Td fontWeight="medium">{committee.name}</Td>
                           <Td>
-                            <Badge colorScheme="purple">{committee.entity_type}</Badge>
+                            <VStack align="start" spacing={1}>
+                              <Text fontWeight="medium" fontSize="sm">{committee.name}</Text>
+                              {committee.connected_organization && (
+                                <Text fontSize="xs" color="gray.500">
+                                  Connected: {committee.connected_organization}
+                                </Text>
+                              )}
+                            </VStack>
                           </Td>
-                          <Td isNumeric fontWeight="bold">{formatCurrency(committee.total_amount)}</Td>
-                          <Td isNumeric>{committee.transaction_count}</Td>
+                          <Td>
+                            <Badge colorScheme={getPacTypeBadgeColor(committee.pac_type, committee.is_corporate_pac)}>
+                              {getPacTypeDisplayName(committee.pac_type, committee.is_corporate_pac)}
+                            </Badge>
+                          </Td>
+                          <Td>
+                            <Text fontSize="xs">{committee.party_affiliation || 'N/A'}</Text>
+                          </Td>
+                          <Td isNumeric fontWeight="bold">
+                            {formatCurrency(committee.total_contributions)}
+                          </Td>
+                          <Td>
+                            <Text fontSize="xs">
+                              {committee.years.length > 0 ? committee.years.join(', ') : 'N/A'}
+                            </Text>
+                          </Td>
                         </Tr>
                       ))}
                     </Tbody>
@@ -401,10 +516,71 @@ const Politician = () => {
               borderRadius="xl"
               boxShadow="md"
               width="100%"
-              height="400px"
+              minHeight="400px"
             >
               <Heading size="lg" mb={4}>INDUSTRIES</Heading>
-              <Text color="gray.500">Industry information will be added here...</Text>
+              
+              {isLoadingIndustries ? (
+                <Center p={8}>
+                  <Spinner />
+                </Center>
+              ) : industriesError ? (
+                <Text color="red.500">{industriesError}</Text>
+              ) : !industryData || industryData.industries.length === 0 ? (
+                <Flex direction="column" align="center" justify="center" p={8}>
+                  <Text color="gray.500" fontSize="lg" mb={2}>No industry connections found for this politician.</Text>
+                  <Text color="gray.400" fontSize="sm">This could be because the politician is new or their data is not yet in our database.</Text>
+                </Flex>
+              ) : (
+                <Accordion allowMultiple>
+                  {industryData.industries.slice(0, 5).map((industry, index) => (
+                    <AccordionItem key={index}>
+                      <AccordionButton>
+                        <Box flex="1" textAlign="left">
+                          <HStack justify="space-between">
+                            <Text fontWeight="medium">{industry.industry}</Text>
+                            <Badge colorScheme="blue">{industry.connectionCount} companies</Badge>
+                          </HStack>
+                        </Box>
+                        <AccordionIcon />
+                      </AccordionButton>
+                      <AccordionPanel pb={4}>
+                        <VStack align="stretch" spacing={3}>
+                          {industry.companies.slice(0, 3).map((company, companyIndex) => (
+                            <Box key={companyIndex} p={3} bg="gray.50" borderRadius="md">
+                              <VStack align="start" spacing={2}>
+                                <HStack justify="space-between" w="100%">
+                                  <Text fontWeight="medium" fontSize="sm">{company.name}</Text>
+                                  <Badge colorScheme={company.type === 'LinkedIn Company' ? 'green' : 'orange'}>
+                                    {company.type}
+                                  </Badge>
+                                </HStack>
+                                
+                                <HStack spacing={4} fontSize="xs" color="gray.600">
+                                  {company.size && <Text>Size: {company.size}</Text>}
+                                  {company.location && <Text>Location: {company.location}</Text>}
+                                </HStack>
+                                
+                                {company.total_contributions && company.total_contributions > 0 && (
+                                  <Text fontWeight="bold" color="green.600" fontSize="sm">
+                                    Contributions: {formatCurrency(company.total_contributions)}
+                                  </Text>
+                                )}
+                                
+                                {company.website && (
+                                  <Link href={company.website} isExternal color="blue.500" fontSize="xs">
+                                    Visit Website <ExternalLinkIcon mx="2px" />
+                                  </Link>
+                                )}
+                              </VStack>
+                            </Box>
+                          ))}
+                        </VStack>
+                      </AccordionPanel>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              )}
             </Box>
           </VStack>
 
