@@ -8,11 +8,23 @@ import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import fs from 'fs';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import fetch from 'node-fetch';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+// API Key middleware
+const validateApiKey = (req, res, next) => {
+  const apiKey = req.headers['x-api-key'];
+  
+  if (!apiKey || apiKey !== process.env.CONGRESS_API_KEY) {
+    return res.status(401).json({ error: 'Invalid or missing API key' });
+  }
+  
+  next();
+};
 
 // Enable CORS
 app.use(cors({
@@ -37,9 +49,12 @@ app.use('/images', express.static(imagesPath, {
 }));
 console.log('Server file loaded3')
 
-
 // Add middleware to parse JSON bodies
 app.use(express.json());
+
+// Apply API key validation only to endpoints that need Congress.gov API
+app.use('/api/congressman/*', validateApiKey);
+app.use('/api/politician/*', validateApiKey);
 
 app.get('/api/members', async (req, res) => {
   let db;
@@ -52,7 +67,7 @@ app.get('/api/members', async (req, res) => {
     console.log('Executing query to get congressmen');
     const members = await db.all('SELECT id, name, state, party, chamber, congress, image FROM congressmen'); 
     console.log(`Found ${members.length} congressmen in database`);
-    console.log('First member:', members[0]);
+    
 
     res.json(members);
   } catch (error) {
@@ -160,60 +175,7 @@ except Exception as e:
     });
   });
 }
-/*
-// API Routes
-app.get('/api/senators', async (req, res) => {
-  let db;
-  try {
-    console.log('Setting up database connection for /api/senators');
-    db = await setupDatabase();
-    
-    console.log('Executing query to get senators');
-    const senators = await db.all('SELECT * FROM senate');
-    
-    console.log(`Successfully retrieved ${senators.length} senators`);
-    
-    // Parse the phones JSON string
-    const formattedSenators = senators.map(senator => ({
-      ...senator,
-      photoUrl: senator.photoUrl || 'https://i.imgur.com/VlKTQWO.png',
-      phones: JSON.parse(senator.phones || '[]')
-    }));
-    
-    res.json(formattedSenators);
-  } catch (error) {
-    console.error('Error fetching senators:', error);
-    
-    // Check for specific error types and provide more detailed response
-    if (error.code === 'SQLITE_CANTOPEN') {
-      res.status(500).json({ 
-        error: 'Database not found or cannot be opened', 
-        details: error.message,
-        path: error.path 
-      });
-    } else if (error.code === 'SQLITE_ERROR') {
-      res.status(500).json({ 
-        error: 'SQL query error', 
-        details: error.message 
-      });
-    } else {
-      res.status(500).json({ 
-        error: 'Failed to fetch senators', 
-        details: error.message 
-      });
-    }
-  } finally {
-    if (db) {
-      try {
-        await db.close();
-        console.log('Database connection closed');
-      } catch (closeError) {
-        console.error('Error closing database connection:', closeError);
-      }
-    }
-  }
-});
-*/
+
 // Add this new endpoint
 app.get('/api/congressman/:id', async (req, res) => {
   let db;
@@ -225,11 +187,11 @@ app.get('/api/congressman/:id', async (req, res) => {
     
     // Add logging to see the query result
     const congressman = await db.get(
-      'SELECT id, name, state, party, chamber, congress, image FROM congressmen WHERE id = ?',
+      'SELECT id, name, state, party, chamber, congress, image, bioguide_id FROM congressmen WHERE id = ?',
       [id]
     );
     
-    console.log('Found congressman:', congressman);
+    
     
     if (!congressman) {
       console.log('Congressman not found in database');
@@ -245,9 +207,10 @@ app.get('/api/congressman/:id', async (req, res) => {
       chamber: congressman.chamber,
       image: congressman.image,
       congress: congressman.congress,
+      bioguide_id: congressman.bioguide_id
     };
     
-    console.log('Sending formatted congressman:', formattedCongressman);
+    
     res.json(formattedCongressman);
   } catch (error) {
     console.error('Error fetching congressman:', error);
@@ -346,7 +309,7 @@ app.get('/api/industry-contributions/:industry', async (req, res) => {
           .sort((a, b) => b[1] - a[1])[0];
         
         if (candidateInfo) {
-          console.log(`Found candidate ${congressman.candidate_id} in candidates table`);
+          
           
           results.push({
             name: candidateInfo.name,
@@ -497,7 +460,7 @@ app.get('/api/candidate-info/:candidateId', async (req, res) => {
   let db;
   try {
     const { candidateId } = req.params;
-    console.log(`Fetching candidate info for ID: ${candidateId}`);
+    
     
     db = await setupDatabase();
     
@@ -508,7 +471,7 @@ app.get('/api/candidate-info/:candidateId', async (req, res) => {
     );
     
     if (candidate) {
-      console.log(`Found candidate ${candidateId} in candidates table`);
+      
       
       // Transform data to a more friendly format
       const formattedCandidate = {
@@ -535,7 +498,7 @@ app.get('/api/candidate-info/:candidateId', async (req, res) => {
     );
     
     if (masterCandidate) {
-      console.log(`Found candidate ${candidateId} in candidates_master table`);
+      
       return res.json({
         id: masterCandidate.CAND_ID,
         name: masterCandidate.CAND_NAME,
@@ -551,7 +514,7 @@ app.get('/api/candidate-info/:candidateId', async (req, res) => {
     );
     
     if (congressmanData) {
-      console.log(`Found candidate ${candidateId} in congressmen table`);
+      
       return res.json({
         id: congressmanData.id,
         name: congressmanData.name,
@@ -752,143 +715,6 @@ app.get('/api/debug-candidates-master', async (req, res) => {
   }
 });
 
-// Add endpoint to get a senator by ID
-/*app.get('/api/senators/:id', async (req, res) => {
-  let db;
-  try {
-    const { id } = req.params;
-    console.log(`Fetching senator with ID: ${id}`);
-    
-    db = await setupDatabase();
-    
-    // Convert string ID to number for comparison
-    const numericId = parseInt(id, 10);
-    
-    if (isNaN(numericId)) {
-      return res.status(400).json({ error: 'Invalid ID format' });
-    }
-    
-    const senator = await db.get('SELECT * FROM senate WHERE id = ?', numericId);
-    
-    if (!senator) {
-      return res.status(404).json({ error: 'Senator not found' });
-    }
-    
-    // Format phones as array if it exists
-    const formattedSenator = {
-      id: senator.id,
-      name: senator.name,
-      party: senator.party,
-      state: senator.state,
-      photoUrl: senator.photoUrl,
-      phones: senator.phones ? JSON.parse(senator.phones) : []
-    };
-    
-    res.json(formattedSenator);
-  } catch (error) {
-    console.error(`Error fetching senator with ID ${req.params.id}:`, error);
-    res.status(500).json({ 
-      error: 'Failed to fetch senator', 
-      details: error.message 
-    });
-  } finally {
-    if (db) {
-      await db.close();
-    }
-  }
-});
-
-// Add endpoint to get committee contributions for a specific politician
-app.get('/api/senators/:id/committees', async (req, res) => {
-  let db;
-  try {
-    const { id } = req.params;
-    db = await setupDatabase();
-    
-    console.log(`Fetching committee contributions for senator ID: ${id}`);
-    
-    // First, get the senator record to get their candidate_id
-    const senator = await db.get('SELECT * FROM senate WHERE id = ?', id);
-    
-    if (!senator) {
-      console.log(`Senator with ID ${id} not found`);
-      return res.status(404).json({ error: 'Senator not found' });
-    }
-    
-    console.log(`Senator found: ${senator.name}`);
-    
-    // Use the candidate_id field from the senate table
-    let contributions = [];
-    
-    if (senator.candidate_id) {
-      console.log(`Using candidate_id from senate table: ${senator.candidate_id}`);
-      
-      // Use the mapped candidate_id directly
-      contributions = await db.all(`
-        SELECT 
-          CMTE_ID, NAME, ENTITY_TP, TRANSACTION_AMT, TRANSACTION_DT
-        FROM 
-          contributorsFromCommittees
-        WHERE 
-          CAND_ID = ? 
-          AND ENTITY_TP != 'IND'
-        ORDER BY 
-          TRANSACTION_AMT DESC
-        LIMIT 50
-      `, senator.candidate_id);
-      
-      console.log(`Found ${contributions.length} contributions using candidate_id: ${senator.candidate_id}`);
-    } else {
-      console.log(`No candidate_id found for senator ${senator.name}. This shouldn't happen since all are mapped.`);
-    }
-    
-    // Format the contributions for the frontend
-    const formattedContributions = contributions.map(contrib => {
-      return {
-        name: contrib.NAME || contrib.CMTE_ID || 'Unknown',
-        entity_type: contrib.ENTITY_TP || 'Unknown',
-        total_amount: parseFloat(contrib.TRANSACTION_AMT) || 0,
-        transaction_count: 1,
-        transaction_date: contrib.TRANSACTION_DT
-      };
-    });
-    
-    // Group by contributor name and sum amounts
-    const contributionsByCommittee = {};
-    
-    for (const contrib of formattedContributions) {
-      if (!contributionsByCommittee[contrib.name]) {
-        contributionsByCommittee[contrib.name] = {
-          name: contrib.name,
-          entity_type: contrib.entity_type,
-          total_amount: 0,
-          transaction_count: 0
-        };
-      }
-      
-      contributionsByCommittee[contrib.name].total_amount += contrib.total_amount;
-      contributionsByCommittee[contrib.name].transaction_count += 1;
-    }
-    
-    // Convert to array and sort by amount
-    const result = Object.values(contributionsByCommittee)
-      .sort((a, b) => b.total_amount - a.total_amount);
-    
-    console.log(`Found ${result.length} committee contributions for senator ID ${id}`);
-    res.json(result);
-    
-  } catch (error) {
-    console.error(`Error fetching committee contributions for senator ${req.params.id}:`, error);
-    console.error(error.stack);
-    // Return empty array instead of error to avoid breaking the UI
-    res.json([]);
-  } finally {
-    if (db) {
-      await db.close();
-    }
-  }
-});
-*/
 // Add a debug endpoint to check contributors table
 app.get('/api/debug-contributors', async (req, res) => {
   let db;
@@ -1212,3 +1038,169 @@ app.post('/api/chat', async (req, res) => {
 app.get('/api/chat', (req, res) => {
   res.status(405).json({ error: 'Please use POST with a JSON body { message } to interact with the chat endpoint.' });
 }); 
+
+// Add new endpoint for recent votes
+app.get('/api/politician/:bioguideId/recent-votes', async (req, res) => {
+  try {
+    const { bioguideId } = req.params;
+    console.log('=== Starting vote fetch for bioguideId:', bioguideId, '===');
+    
+    // First verify the member exists and get their details
+    const memberUrl = `https://api.congress.gov/v3/member?api_key=${process.env.CONGRESS_API_KEY}&format=json&bioguideId=${bioguideId}`;
+    console.log('1. Verifying member exists at URL:', memberUrl);
+    
+    const memberResponse = await fetch(memberUrl);
+    const memberData = await memberResponse.json();
+    console.log('2. Member verification response:', JSON.stringify(memberData, null, 2));
+    
+    if (!memberResponse.ok) {
+      console.error('3. Member verification failed:', memberResponse.status);
+      return res.status(404).json({ 
+        error: 'Member not found',
+        details: `No member found with bioguide ID: ${bioguideId}`
+      });
+    }
+
+    // For 119th Congress, we'll check both sessions but limit to recent votes
+    const sessions = [2, 1]; // Check session 2 first (more recent), then session 1
+    let allVotes = [];
+    const MAX_VOTES = 10; // Limit to 10 most recent votes
+
+    for (const session of sessions) {
+      if (allVotes.length >= MAX_VOTES) break;
+      
+      console.log(`4. Checking session ${session} of 119th Congress...`);
+      
+      // Get recent votes for this session
+      const votesUrl = `https://api.congress.gov/v3/house-vote?api_key=${process.env.CONGRESS_API_KEY}&format=json&congress=119&session=${session}&limit=50`;
+      console.log('5. Fetching votes from URL:', votesUrl);
+      
+      const votesResponse = await fetch(votesUrl);
+      if (!votesResponse.ok) {
+        console.error('6. Failed to fetch votes:', votesResponse.status);
+        continue;
+      }
+      
+      const votesData = await votesResponse.json();
+      const sessionVotes = votesData.houseRollCallVotes || [];
+      console.log(`7. Found ${sessionVotes.length} votes for session ${session}`);
+      
+      // For each vote, get the member votes and bill information
+      const votesWithDetails = await Promise.all(
+        sessionVotes.map(async (vote) => {
+          // Get member votes - using the correct URL structure
+          const memberVotesUrl = `https://api.congress.gov/v3/house-vote/119/${session}/${vote.rollCallNumber}/members?api_key=${process.env.CONGRESS_API_KEY}&format=json&limit=500`;
+          console.log('8. Fetching member votes from URL:', memberVotesUrl);
+          
+          const memberVotesResponse = await fetch(memberVotesUrl);
+          if (!memberVotesResponse.ok) {
+            console.error(`9. Failed to fetch member votes for vote ${vote.rollCallNumber}:`, memberVotesResponse.status);
+            return null;
+          }
+          
+          const memberVotesData = await memberVotesResponse.json();
+          console.log(`10. Raw member votes data for vote ${vote.rollCallNumber}:`, JSON.stringify(memberVotesData, null, 2));
+          
+          // The member votes are in the houseRollCallMemberVotes array
+          const results = memberVotesData.houseRollCallMemberVotes?.[0]?.members || [];
+          console.log(`11. Vote ${vote.rollCallNumber} - Number of member votes: ${results.length}`);
+          console.log('12. Available bioguideIds:', results.map(r => r.bioguideID).join(', '));
+          
+          // Find this member's vote
+          const memberVote = results.find(result => {
+            console.log(`13. Comparing ${result.bioguideID} with ${bioguideId}`);
+            return result.bioguideID === bioguideId;
+          });
+          
+          if (!memberVote) {
+            console.log(`14. No vote found for member ${bioguideId} in vote ${vote.rollCallNumber}`);
+            return null;
+          }
+
+          console.log(`15. Found vote for member ${bioguideId} in vote ${vote.rollCallNumber}:`, memberVote.voteCast);
+
+          // Get bill information if available
+          let billInfo = null;
+          if (vote.bill) {
+            const billUrl = `https://api.congress.gov/v3/bill/119/${vote.bill.billType}/${vote.bill.billNumber}?api_key=${process.env.CONGRESS_API_KEY}&format=json`;
+            const subjectsUrl = `https://api.congress.gov/v3/bill/119/${vote.bill.billType}/${vote.bill.billNumber}/subjects?api_key=${process.env.CONGRESS_API_KEY}&format=json`;
+            try {
+              const [billResponse, subjectsResponse] = await Promise.all([
+                fetch(billUrl),
+                fetch(subjectsUrl)
+              ]);
+              
+              if (billResponse.ok) {
+                const billData = await billResponse.json();
+                billInfo = {
+                  title: billData.bill?.title,
+                  shortTitle: billData.bill?.shortTitle,
+                  latestAction: billData.bill?.latestAction
+                };
+              }
+              
+              if (subjectsResponse.ok) {
+                const subjectsData = await subjectsResponse.json();
+                if (subjectsData.subjects?.policyArea?.name) {
+                  billInfo = {
+                    ...billInfo,
+                    policyArea: subjectsData.subjects.policyArea.name
+                  };
+                }
+              }
+            } catch (error) {
+              console.error(`16. Error fetching bill info for ${vote.bill.billType}${vote.bill.billNumber}`);
+            }
+          }
+
+          return {
+            congress: vote.congress,
+            session: vote.sessionNumber,
+            rollCallNumber: vote.rollCallNumber,
+            date: vote.startDate,
+            question: vote.question,
+            description: vote.description,
+            voteCast: memberVote.voteCast,
+            voteParty: memberVote.voteParty,
+            voteState: memberVote.voteState,
+            bill: vote.bill,
+            billInfo: billInfo
+          };
+        })
+      );
+      
+      // Filter out null results and add to all votes
+      const filteredVotes = votesWithDetails.filter(vote => vote !== null);
+      console.log(`17. Found ${filteredVotes.length} votes for member in session ${session}`);
+      allVotes = [...allVotes, ...filteredVotes];
+    }
+    
+    console.log('18. Total votes found across all sessions:', allVotes.length);
+    
+    if (allVotes.length === 0) {
+      return res.json({ 
+        votes: [],
+        message: 'No votes found for this member in the 119th Congress'
+      });
+    }
+    
+    // Sort votes by date, most recent first
+    allVotes.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    // Take only the most recent votes
+    const recentVotes = allVotes.slice(0, MAX_VOTES);
+    
+    res.json({
+      votes: recentVotes
+    });
+    
+  } catch (error) {
+    console.error('19. Error in vote fetch:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch votes',
+      details: error.message 
+    });
+  }
+});
+
+app.all('/{*any}', (req, res, next) => {})

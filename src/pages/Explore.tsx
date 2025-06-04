@@ -118,6 +118,19 @@ const Explore = () => {
                 transition: "transform 0.3s ease-in-out"
               }}
             >
+              {/* Overlay for dark blue filter */}
+              {industry.name === 'Insurance' && (
+                <Box
+                  position="absolute"
+                  top={0}
+                  left={0}
+                  right={0}
+                  bottom={0}
+                  bg="blue.900"
+                  opacity={0.4}
+                  zIndex={1}
+                />
+              )}
               <Box
                 position="absolute"
                 top={0}
