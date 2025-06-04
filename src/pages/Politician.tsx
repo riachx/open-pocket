@@ -37,10 +37,9 @@ import {
   AccordionIcon,
 } from '@chakra-ui/react';
 
-import { ArrowBackIcon, ArrowForwardIcon } from '@chakra-ui/icons';
+import { ArrowBackIcon, ArrowForwardIcon, ExternalLinkIcon } from '@chakra-ui/icons';
 import ChatBot from '../components/ChatBot';
 import RecentVoteInfo from '../components/RecentVoteInfo';
-import ApiTestSection from '../components/ApiTestSection';
 import CongressmanBanner from '../components/CongressmanBanner';
 import CommitteesSection from '../components/CommitteesSection';
 
@@ -138,7 +137,7 @@ const Politician = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [congressman, setCongressman] = useState<Congressman | null>(null);
-  const [committees, setCommittees] = useState<CommitteeContribution[]>([]);
+  const [committeeData, setCommitteeData] = useState<CommitteeData | null>(null);
   const [industryData, setIndustryData] = useState<IndustryData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingCommittees, setIsLoadingCommittees] = useState(true);
@@ -164,6 +163,15 @@ const Politician = () => {
     message: '',
     data: null
   });
+
+  // Helper function to format currency
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
 
   // Test function to verify Congress API
   const testCongressAPI = async () => {
@@ -372,17 +380,9 @@ const Politician = () => {
         // Find the first non-empty array
         const memberVotes = possiblePaths.find(arr => Array.isArray(arr) && arr.length > 0) || [];
 
-  
-        // Fetch the senator data
-        const response = await fetch(`http://localhost:3001/api/senator/${numericId}`);
-        console.log('Response status:', response.status);
-
-        
-        
         // Find this congressman's vote
         const congressmanVote = memberVotes.find(
           (member: any) => {
-            
             return member.bioguideID === congressman?.bioguide_id;
           }
         );
@@ -504,7 +504,7 @@ const Politician = () => {
         setIsLoadingCommittees(true);
         console.log('Fetching committee contributions for politician ID:', id);
 
-        let url = `http://localhost:3001/api/congressman/${id}/committees`;
+        let url = `http://localhost:3001/api/senator/${id}/committees`;
 
         // Use the direct endpoint for a specific congressman
         const response = await fetch(url, {
@@ -515,17 +515,25 @@ const Politician = () => {
 
         // Even if we get a 404 or 500, we'll still try to parse the response
         // This is to handle the case where the server returns an empty array
-        const data = await response.json().catch(() => []);
+        const data = await response.json().catch(() => null);
         console.log('Received committee data:', data);
 
-        // Extract contributions from debug endpoint if needed
-        const contributionsData = id === '1282' && data.contributions ? data.contributions : data;
-
-        // Ensure we have array data
-        const contributions = Array.isArray(contributionsData) ? contributionsData : [];
-        console.log('Found committee contributions:', contributions.length);
-
-        setCommittees(contributions);
+        if (data) {
+          setCommitteeData(data);
+        } else {
+          setCommitteeData({
+            totalContributions: 0,
+            totalCommittees: 0,
+            committees: [],
+            pacsByType: {
+              traditional_pacs: [],
+              super_pacs: [],
+              leadership_pacs: [],
+              corporate_pacs: [],
+              other_committees: []
+            }
+          });
+        }
       } catch (err) {
         console.error('Error fetching committee data:', err);
         setCommitteesError(err instanceof Error ? err.message : 'Failed to fetch committee data');
@@ -534,7 +542,7 @@ const Politician = () => {
       }
     };
 
-    //fetchCommitteeContributions();
+    fetchCommitteeData();
   }, [id]);
 
   // Fetch industry data using new money tracking endpoint
@@ -544,7 +552,7 @@ const Politician = () => {
       
       try {
         setIsLoadingIndustries(true);
-        console.log('Fetching industry data for senator ID:', id);
+        console.log('Fetching industry data for congressman ID:', id);
         
         const response = await fetch(`http://localhost:3001/api/senator/${id}/industries`);
         const data = await response.json();

@@ -8,7 +8,6 @@ import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import fs from 'fs';
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import fetch from 'node-fetch';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,9 +51,7 @@ console.log('Server file loaded3')
 // Add middleware to parse JSON bodies
 app.use(express.json());
 
-// Apply API key validation only to endpoints that need Congress.gov API
-app.use('/api/congressman/*', validateApiKey);
-app.use('/api/politician/*', validateApiKey);
+// Note: API key validation will be applied to specific routes instead of using wildcards
 
 app.get('/api/members', async (req, res) => {
   let db;
@@ -235,7 +232,7 @@ except Exception as e:
 }
 
 // Add this new endpoint
-app.get('/api/congressman/:id', async (req, res) => {
+app.get('/api/congressman/:id', validateApiKey, async (req, res) => {
   let db;
   try {
     const { id } = req.params;
@@ -1131,34 +1128,34 @@ app.get('/api/senator/:id/money-report', async (req, res) => {
   let db;
   try {
     const { id } = req.params;
-    console.log(`Fetching comprehensive money report for senator ID: ${id}`);
+    console.log(`Fetching comprehensive money report for congressman ID: ${id}`);
     
-    // First, get the senator and find their candidate_id
+    // First, get the congressman and find their candidate_id
     db = await setupDatabase();
-    const senator = await db.get('SELECT * FROM senators WHERE id = ?', [id]);
+    const congressman = await db.get('SELECT * FROM congressmen WHERE id = ?', [id]);
     
-    if (!senator) {
-      return res.status(404).json({ error: 'Senator not found' });
+    if (!congressman) {
+      return res.status(404).json({ error: 'Congressman not found' });
     }
     
-    // We need to find the candidate_id for this senator
+    // We need to find the candidate_id for this congressman
     // Try to match by name in the candidates_master table
     let candidateId = null;
     
-    // Clean up the senator name for matching
-    const senatorName = senator.name.toUpperCase();
+    // Clean up the congressman name for matching
+    const congressmanName = congressman.name.toUpperCase();
     
     // Try exact match first
     const candidateMatch = await db.get(
       'SELECT CAND_ID FROM candidates_master WHERE UPPER(CAND_NAME) = ?',
-      [senatorName]
+      [congressmanName]
     );
     
     if (candidateMatch) {
       candidateId = candidateMatch.CAND_ID;
     } else {
       // Try partial match (last name)
-      const lastName = senatorName.split(',')[0] || senatorName.split(' ').pop();
+      const lastName = congressmanName.split(',')[0] || congressmanName.split(' ').pop();
       const partialMatch = await db.get(
         'SELECT CAND_ID FROM candidates_master WHERE UPPER(CAND_NAME) LIKE ? LIMIT 1',
         [`%${lastName}%`]
@@ -1170,29 +1167,217 @@ app.get('/api/senator/:id/money-report', async (req, res) => {
     }
     
     if (!candidateId) {
-      console.log(`No candidate ID found for senator: ${senatorName}`);
+      console.log(`No candidate ID found for congressman: ${congressmanName}`);
       return res.json({
         error: 'No financial data found for this politician',
-        senator: senator
+        congressman: congressman
       });
     }
     
-    console.log(`Found candidate ID: ${candidateId} for senator: ${senatorName}`);
+    console.log(`Found candidate ID: ${candidateId} for congressman: ${congressmanName}`);
     
     // Call the Python money tracking function
     const moneyReport = await runMoneyTrackFunction('generate_comprehensive_money_report', [candidateId]);
     
     res.json({
-      senator: senator,
+      congressman: congressman,
       candidateId: candidateId,
       moneyData: moneyReport
     });
     
   } catch (error) {
-    console.error(`Error fetching money report for senator ${req.params.id}:`, error);
+    console.error(`Error fetching money report for congressman ${req.params.id}:`, error);
     res.status(500).json({ 
       error: 'Failed to fetch money report', 
       details: error.message 
+    });
+  } finally {
+    if (db) {
+      await db.close();
+    }
+  }
+});
+
+// Get committee/PAC data for a senator (for AFFILIATED COMMITTEES section)
+app.get('/api/senator/:id/committees', async (req, res) => {
+  let db;
+  try {
+    const { id } = req.params;
+    console.log(`Fetching committee data for congressman ID: ${id}`);
+    
+    // Get congressman and find candidate_id
+    db = await setupDatabase();
+    const congressman = await db.get('SELECT * FROM congressmen WHERE id = ?', [id]);
+    
+    if (!congressman) {
+      return res.status(404).json({ error: 'Congressman not found' });
+    }
+    
+    // Find candidate_id (same logic as above)
+    const congressmanName = congressman.name.toUpperCase();
+    let candidateId = null;
+    
+    const candidateMatch = await db.get(
+      'SELECT CAND_ID FROM candidates_master WHERE UPPER(CAND_NAME) = ?',
+      [congressmanName]
+    );
+    
+    if (candidateMatch) {
+      candidateId = candidateMatch.CAND_ID;
+    } else {
+      const lastName = congressmanName.split(',')[0] || congressmanName.split(' ').pop();
+      const partialMatch = await db.get(
+        'SELECT CAND_ID FROM candidates_master WHERE UPPER(CAND_NAME) LIKE ? LIMIT 1',
+        [`%${lastName}%`]
+      );
+      
+      if (partialMatch) {
+        candidateId = partialMatch.CAND_ID;
+      }
+    }
+    
+    if (!candidateId) {
+      return res.json({
+        totalContributions: 0,
+        totalCommittees: 0,
+        committees: [],
+        message: 'No committee data found for this politician'
+      });
+    }
+    
+    // Get PACs by type from Python function
+    const pacsByType = await runMoneyTrackFunction('get_politician_pacs', [candidateId]);
+    
+    // Get contribution totals
+    const contributionTotals = await runMoneyTrackFunction('get_politician_total_contributions', [candidateId]);
+    
+    // Format the data for the frontend
+    let allCommittees = [];
+    let totalCommittees = 0;
+    
+    // Combine all PAC types
+    if (pacsByType) {
+      Object.keys(pacsByType).forEach(type => {
+        if (Array.isArray(pacsByType[type])) {
+          allCommittees = allCommittees.concat(pacsByType[type].map(pac => ({
+            ...pac,
+            pac_category: type
+          })));
+          totalCommittees += pacsByType[type].length;
+        }
+      });
+    }
+    
+    // Sort by contribution amount
+    allCommittees.sort((a, b) => (b.total_contributions || 0) - (a.total_contributions || 0));
+    
+    res.json({
+      totalContributions: contributionTotals?.committee_contributions || 0,
+      totalCommittees: totalCommittees,
+      committees: allCommittees.slice(0, 20), // Top 20 committees
+      pacsByType: pacsByType
+    });
+    
+  } catch (error) {
+    console.error(`Error fetching committee data for congressman ${req.params.id}:`, error);
+    res.json({
+      totalContributions: 0,
+      totalCommittees: 0,
+      committees: [],
+      error: error.message
+    });
+  } finally {
+    if (db) {
+      await db.close();
+    }
+  }
+});
+
+// Get industry connections for a senator (for INDUSTRIES section)
+app.get('/api/senator/:id/industries', async (req, res) => {
+  let db;
+  try {
+    const { id } = req.params;
+    console.log(`Fetching industry data for congressman ID: ${id}`);
+    
+    // Get congressman and find candidate_id
+    db = await setupDatabase();
+    const congressman = await db.get('SELECT * FROM congressmen WHERE id = ?', [id]);
+    
+    if (!congressman) {
+      return res.status(404).json({ error: 'Congressman not found' });
+    }
+    
+    // Find candidate_id (same logic as above)
+    const congressmanName = congressman.name.toUpperCase();
+    let candidateId = null;
+    
+    const candidateMatch = await db.get(
+      'SELECT CAND_ID FROM candidates_master WHERE UPPER(CAND_NAME) = ?',
+      [congressmanName]
+    );
+    
+    if (candidateMatch) {
+      candidateId = candidateMatch.CAND_ID;
+    } else {
+      const lastName = congressmanName.split(',')[0] || congressmanName.split(' ').pop();
+      const partialMatch = await db.get(
+        'SELECT CAND_ID FROM candidates_master WHERE UPPER(CAND_NAME) LIKE ? LIMIT 1',
+        [`%${lastName}%`]
+      );
+      
+      if (partialMatch) {
+        candidateId = partialMatch.CAND_ID;
+      }
+    }
+    
+    if (!candidateId) {
+      return res.json({
+        industries: [],
+        message: 'No industry data found for this politician'
+      });
+    }
+    
+    // Get corporate connections from Python function
+    const corporateConnections = await runMoneyTrackFunction('get_politician_corporate_connections', [candidateId]);
+    
+    // Process and categorize the data by industry
+    const industryMap = {};
+    
+    if (corporateConnections && Array.isArray(corporateConnections)) {
+      corporateConnections.forEach(connection => {
+        const industry = connection.industry || 'Other';
+        
+        if (!industryMap[industry]) {
+          industryMap[industry] = {
+            industry: industry,
+            companies: [],
+            totalContributions: 0,
+            connectionCount: 0
+          };
+        }
+        
+        industryMap[industry].companies.push(connection);
+        industryMap[industry].totalContributions += connection.total_contributions || 0;
+        industryMap[industry].connectionCount += 1;
+      });
+    }
+    
+    // Convert to array and sort by total contributions
+    const industries = Object.values(industryMap)
+      .sort((a, b) => b.totalContributions - a.totalContributions)
+      .slice(0, 10); // Top 10 industries
+    
+    res.json({
+      industries: industries,
+      corporateConnections: corporateConnections
+    });
+    
+  } catch (error) {
+    console.error(`Error fetching industry data for congressman ${req.params.id}:`, error);
+    res.json({
+      industries: [],
+      error: error.message
     });
   } finally {
     if (db) {
@@ -1400,192 +1585,10 @@ app.get('/api/politician/:bioguideId/recent-votes', async (req, res) => {
     res.status(500).json({ 
       error: 'Failed to fetch votes',
       details: error.message 
-// Get committee/PAC data for a senator (for AFFILIATED COMMITTEES section)
-app.get('/api/senator/:id/committees', async (req, res) => {
-  let db;
-  try {
-    const { id } = req.params;
-    console.log(`Fetching committee data for senator ID: ${id}`);
-    
-    // Get senator and find candidate_id
-    db = await setupDatabase();
-    const senator = await db.get('SELECT * FROM senators WHERE id = ?', [id]);
-    
-    if (!senator) {
-      return res.status(404).json({ error: 'Senator not found' });
-    }
-    
-    // Find candidate_id (same logic as above)
-    const senatorName = senator.name.toUpperCase();
-    let candidateId = null;
-    
-    const candidateMatch = await db.get(
-      'SELECT CAND_ID FROM candidates_master WHERE UPPER(CAND_NAME) = ?',
-      [senatorName]
-    );
-    
-    if (candidateMatch) {
-      candidateId = candidateMatch.CAND_ID;
-    } else {
-      const lastName = senatorName.split(',')[0] || senatorName.split(' ').pop();
-      const partialMatch = await db.get(
-        'SELECT CAND_ID FROM candidates_master WHERE UPPER(CAND_NAME) LIKE ? LIMIT 1',
-        [`%${lastName}%`]
-      );
-      
-      if (partialMatch) {
-        candidateId = partialMatch.CAND_ID;
-      }
-    }
-    
-    if (!candidateId) {
-      return res.json({
-        totalContributions: 0,
-        totalCommittees: 0,
-        committees: [],
-        message: 'No committee data found for this politician'
-      });
-    }
-    
-    // Get PACs by type from Python function
-    const pacsByType = await runMoneyTrackFunction('get_politician_pacs', [candidateId]);
-    
-    // Get contribution totals
-    const contributionTotals = await runMoneyTrackFunction('get_politician_total_contributions', [candidateId]);
-    
-    // Format the data for the frontend
-    let allCommittees = [];
-    let totalCommittees = 0;
-    
-    // Combine all PAC types
-    if (pacsByType) {
-      Object.keys(pacsByType).forEach(type => {
-        if (Array.isArray(pacsByType[type])) {
-          allCommittees = allCommittees.concat(pacsByType[type].map(pac => ({
-            ...pac,
-            pac_category: type
-          })));
-          totalCommittees += pacsByType[type].length;
-        }
-      });
-    }
-    
-    // Sort by contribution amount
-    allCommittees.sort((a, b) => (b.total_contributions || 0) - (a.total_contributions || 0));
-    
-    res.json({
-      totalContributions: contributionTotals?.committee_contributions || 0,
-      totalCommittees: totalCommittees,
-      committees: allCommittees.slice(0, 20), // Top 20 committees
-      pacsByType: pacsByType
     });
-    
-  } catch (error) {
-    console.error(`Error fetching committee data for senator ${req.params.id}:`, error);
-    res.json({
-      totalContributions: 0,
-      totalCommittees: 0,
-      committees: [],
-      error: error.message
-    });
-  } finally {
-    if (db) {
-      await db.close();
-    }
   }
 });
 
-// Get industry connections for a senator (for INDUSTRIES section)
-app.get('/api/senator/:id/industries', async (req, res) => {
-  let db;
-  try {
-    const { id } = req.params;
-    console.log(`Fetching industry data for senator ID: ${id}`);
-    
-    // Get senator and find candidate_id
-    db = await setupDatabase();
-    const senator = await db.get('SELECT * FROM senators WHERE id = ?', [id]);
-    
-    if (!senator) {
-      return res.status(404).json({ error: 'Senator not found' });
-    }
-    
-    // Find candidate_id (same logic as above)
-    const senatorName = senator.name.toUpperCase();
-    let candidateId = null;
-    
-    const candidateMatch = await db.get(
-      'SELECT CAND_ID FROM candidates_master WHERE UPPER(CAND_NAME) = ?',
-      [senatorName]
-    );
-    
-    if (candidateMatch) {
-      candidateId = candidateMatch.CAND_ID;
-    } else {
-      const lastName = senatorName.split(',')[0] || senatorName.split(' ').pop();
-      const partialMatch = await db.get(
-        'SELECT CAND_ID FROM candidates_master WHERE UPPER(CAND_NAME) LIKE ? LIMIT 1',
-        [`%${lastName}%`]
-      );
-      
-      if (partialMatch) {
-        candidateId = partialMatch.CAND_ID;
-      }
-    }
-    
-    if (!candidateId) {
-      return res.json({
-        industries: [],
-        message: 'No industry data found for this politician'
-      });
-    }
-    
-    // Get corporate connections from Python function
-    const corporateConnections = await runMoneyTrackFunction('get_politician_corporate_connections', [candidateId]);
-    
-    // Process and categorize the data by industry
-    const industryMap = {};
-    
-    if (corporateConnections && Array.isArray(corporateConnections)) {
-      corporateConnections.forEach(connection => {
-        const industry = connection.industry || 'Other';
-        
-        if (!industryMap[industry]) {
-          industryMap[industry] = {
-            industry: industry,
-            companies: [],
-            totalContributions: 0,
-            connectionCount: 0
-          };
-        }
-        
-        industryMap[industry].companies.push(connection);
-        industryMap[industry].totalContributions += connection.total_contributions || 0;
-        industryMap[industry].connectionCount += 1;
-      });
-    }
-    
-    // Convert to array and sort by total contributions
-    const industries = Object.values(industryMap)
-      .sort((a, b) => b.totalContributions - a.totalContributions)
-      .slice(0, 10); // Top 10 industries
-    
-    res.json({
-      industries: industries,
-      corporateConnections: corporateConnections
-    });
-    
-  } catch (error) {
-    console.error(`Error fetching industry data for senator ${req.params.id}:`, error);
-    res.json({
-      industries: [],
-      error: error.message
-    });
-  } finally {
-    if (db) {
-      await db.close();
-    }
-  }
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
-
-app.all('/{*any}', (req, res, next) => {})
