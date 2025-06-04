@@ -82,7 +82,8 @@ app.get('/api/members', async (req, res) => {
 
 // Database setup
 async function setupDatabase() {
-  const dbPath = path.resolve(__dirname, 'services/politicaldata.db');
+  // Updated path to the external SSD where our database is actually located
+  const dbPath = '/Volumes/Extreme SSD/OpenPockets/politicaldata.db';
   
   // Check if file exists
   if (!fs.existsSync(dbPath)) {
