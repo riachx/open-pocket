@@ -46,7 +46,9 @@ def init_db():
             party TEXT,
             chamber TEXT,
             congress INTEGER,
-            image TEXT
+            image TEXT,
+            bioguide_id TEXT,
+            fec_ids TEXT
         )
         ''')
 
@@ -60,11 +62,13 @@ def init_db():
             party TEXT,
             chamber TEXT,
             congress INTEGER,
-            image TEXT
+            image TEXT,
+            bioguide_id TEXT,
+            fec_ids TEXT
         )
         ''')
 
-        with open("../assets/data/members.csv", newline='', encoding='utf-8') as csvfile:
+        with open("../assets/data/members-connected.csv", newline='', encoding='utf-8') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
                 # Adjust field names based on VoteView CSV columns
@@ -74,12 +78,14 @@ def init_db():
                 chamber = row['chamber']
                 congress = row['congress']
                 image = row['image']
+                bioguide_id = row['bioguide_id']
+                fec_ids = row['fec_ids']
                 
 
                 c.execute('''
-                    INSERT OR IGNORE INTO congressmen (name, state, party, congress, chamber, image)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                ''', (name, state, party, congress, chamber, image))
+                    INSERT OR IGNORE INTO congressmen (name, state, party, congress, chamber, image, bioguide_id, fec_ids)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (name, state, party, congress, chamber, image, bioguide_id, fec_ids))
         
         c.execute('''
             
