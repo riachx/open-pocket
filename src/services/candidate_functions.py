@@ -33,7 +33,9 @@ def getCandidateIdByName(candidate_name):
     """
     try:
         # Updated path to external SSD location
-        db_path = '/Volumes/Extreme SSD/OpenPockets/politicaldata.db'
+        # Get the correct path to the database fileAdd commentMore actions
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        db_path = os.path.join(script_dir, 'politicaldata.db')
         
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
