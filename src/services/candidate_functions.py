@@ -133,3 +133,248 @@ if __name__ == "__main__":
     for test_name in test_cases:
         result = getCandidateIdByName(test_name)
         print(f"  '{test_name}' -> {result}")
+
+def get_politician_pacs(candidate_id):
+    """
+    Get all PACs and their contributions for a candidate.
+    
+    Args:
+        candidate_id (str): The candidate's ID
+        
+    Returns:
+        dict: Dictionary containing PACs by type with their contribution details
+    """
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        db_path = os.path.join(script_dir, 'politicaldata.db')
+        
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Get all PAC contributions for this candidate
+        cursor.execute('''
+            SELECT 
+                contributor_name,
+                entity_type,
+                amount,
+                year
+            FROM 
+                contributorsFromCommittees
+            WHERE 
+                candidate_id = ? 
+                AND entity_type != 'IND'
+            ORDER BY 
+                amount DESC
+        ''', (candidate_id,))
+        
+        contributions = cursor.fetchall()
+        
+        # Group by PAC and calculate totals
+        pacs = {}
+        for contrib in contributions:
+            name, entity_type, amount, year = contrib
+            
+            if name not in pacs:
+                pacs[name] = {
+                    'committee_id': name,  # Using name as ID since we don't have CMTE_ID
+                    'name': name,
+                    'pac_type': entity_type,
+                    'designation': entity_type,
+                    'party_affiliation': 'Unknown',
+                    'is_corporate_pac': entity_type in ['CORP', 'ORG'],
+                    'total_contributions': 0,
+                    'years': set(),
+                    'pac_category': 'other_committees'
+                }
+            
+            pacs[name]['total_contributions'] += float(amount or 0)
+            if year:
+                pacs[name]['years'].add(int(year))
+        
+        # Convert years sets to sorted lists
+        for pac in pacs.values():
+            pac['years'] = sorted(list(pac['years']))
+        
+        # Categorize PACs
+        pacs_by_type = {
+            'traditional_pacs': [],
+            'super_pacs': [],
+            'leadership_pacs': [],
+            'corporate_pacs': [],
+            'other_committees': []
+        }
+        
+        for pac in pacs.values():
+            if pac['is_corporate_pac']:
+                pac['pac_category'] = 'corporate_pacs'
+                pacs_by_type['corporate_pacs'].append(pac)
+            elif pac['pac_type'] in ['N', 'Q']:
+                pac['pac_category'] = 'traditional_pacs'
+                pacs_by_type['traditional_pacs'].append(pac)
+            elif pac['pac_type'] == 'O':
+                pac['pac_category'] = 'super_pacs'
+                pacs_by_type['super_pacs'].append(pac)
+            elif pac['pac_type'] in ['V', 'W']:
+                pac['pac_category'] = 'leadership_pacs'
+                pacs_by_type['leadership_pacs'].append(pac)
+            else:
+                pacs_by_type['other_committees'].append(pac)
+        
+        conn.close()
+        return pacs_by_type
+        
+    except Exception as e:
+        print(f"Error getting PACs: {e}")
+        return None
+
+def get_politician_total_contributions(candidate_id):
+    """
+    Get total contribution amounts for a candidate.
+    
+    Args:
+        candidate_id (str): The candidate's ID
+        
+    Returns:
+        dict: Dictionary containing total contribution amounts by type
+    """
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        db_path = os.path.join(script_dir, 'politicaldata.db')
+        
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Get total committee contributions
+        cursor.execute('''
+            SELECT SUM(amount)
+            FROM contributorsFromCommittees
+            WHERE candidate_id = ? AND entity_type != 'IND'
+        ''', (candidate_id,))
+        
+        committee_total = cursor.fetchone()[0] or 0
+        
+        # Get total individual contributions
+        cursor.execute('''
+            SELECT SUM(amount)
+            FROM contributorsFromCommittees
+            WHERE candidate_id = ? AND entity_type = 'IND'
+        ''', (candidate_id,))
+        
+        individual_total = cursor.fetchone()[0] or 0
+        
+        conn.close()
+        
+        return {
+            'committee_contributions': float(committee_total),
+            'individual_contributions': float(individual_total),
+            'total_contributions': float(committee_total) + float(individual_total)
+        }
+        
+    except Exception as e:
+        print(f"Error getting contribution totals: {e}")
+        return None
+
+def get_politician_corporate_connections(candidate_id):
+    """
+    Get corporate connections and their contributions for a candidate.
+    
+    Args:
+        candidate_id (str): The candidate's ID
+        
+    Returns:
+        list: List of corporate connections with their details
+    """
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        db_path = os.path.join(script_dir, 'politicaldata.db')
+        
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Get corporate PAC contributions
+        cursor.execute('''
+            SELECT 
+                contributor_name,
+                entity_type,
+                amount,
+                year
+            FROM 
+                contributorsFromCommittees
+            WHERE 
+                candidate_id = ? 
+                AND entity_type IN ('CORP', 'ORG')
+            ORDER BY 
+                amount DESC
+        ''', (candidate_id,))
+        
+        contributions = cursor.fetchall()
+        
+        # Group by company and calculate totals
+        companies = {}
+        for contrib in contributions:
+            name, entity_type, amount, year = contrib
+            
+            if name not in companies:
+                companies[name] = {
+                    'name': name,
+                    'type': 'Corporate PAC Sponsor',
+                    'industry': 'Unknown',
+                    'size': 'Unknown',
+                    'country': 'USA',
+                    'connection_type': 'PAC Contribution',
+                    'total_contributions': 0
+                }
+            
+            companies[name]['total_contributions'] += float(amount or 0)
+        
+        conn.close()
+        
+        # Convert to list and sort by contribution amount
+        return sorted(
+            list(companies.values()),
+            key=lambda x: x['total_contributions'],
+            reverse=True
+        )
+        
+    except Exception as e:
+        print(f"Error getting corporate connections: {e}")
+        return None
+
+def test_politician_functions():
+    """
+    Test all politician-related functions with a single test politician.
+    """
+    # Test with a known politician (e.g., "Thomas Cotton")
+    test_name = "Thomas Cotton"
+    print(f"\nTesting functions for politician: {test_name}")
+    
+    # Get candidate ID
+    candidate_id = getCandidateIdByName(test_name)
+    print(f"\nCandidate ID: {candidate_id}")
+    
+    if candidate_id:
+        # Test PAC functions
+        pacs = get_politician_pacs(candidate_id)
+        print("\nPACs by type:")
+        for pac_type, pac_list in pacs.items():
+            print(f"\n{pac_type}:")
+            for pac in pac_list[:3]:  # Show first 3 PACs of each type
+                print(f"  - {pac['name']}: ${pac['total_contributions']:,.2f}")
+        
+        # Test total contributions
+        totals = get_politician_total_contributions(candidate_id)
+        print("\nTotal Contributions:")
+        print(f"  Committee: ${totals['committee_contributions']:,.2f}")
+        print(f"  Individual: ${totals['individual_contributions']:,.2f}")
+        print(f"  Total: ${totals['total_contributions']:,.2f}")
+        
+        # Test corporate connections
+        connections = get_politician_corporate_connections(candidate_id)
+        print("\nTop Corporate Connections:")
+        for company in connections[:5]:  # Show top 5 connections
+            print(f"  - {company['name']}: ${company['total_contributions']:,.2f}")
+    else:
+        print(f"No candidate ID found for {test_name}")
+
+if __name__ == "__main__":
+    test_politician_functions()
