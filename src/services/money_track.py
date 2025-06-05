@@ -5,7 +5,7 @@ from candidate_functions import getCandidateIdByName
 def get_db_connection():
     """Get a connection to the SQLite database with proper error handling"""
     try:
-        db_path = '/Volumes/Extreme SSD/OpenPockets/politicaldata.db'
+        db_path = 'src/services/politicaldata.db'
         conn = sqlite3.connect(db_path, timeout=20)
         
         # Optimize connection settings
@@ -257,6 +257,69 @@ def get_politician_super_pacs(candidate_id, conn=None):
             conn.close()
         return []
 
+def get_industry_for_company(company_name, cursor):
+    """
+    Determine the industry for a company based on its name and available data.
+    """
+    print(f"\nDetermining industry for: {company_name}")
+    
+    # Common industry mappings for political companies
+    industry_keywords = {
+        'DATA': 'Data & Analytics',
+        'SERVICES': 'Professional Services',
+        'CONSULTING': 'Professional Services',
+        'CONSULTANTS': 'Professional Services',
+        'MARKETING': 'Marketing & Advertising',
+        'CREATIVE': 'Marketing & Advertising',
+        'PRINTING': 'Printing & Publishing',
+        'MAIL': 'Printing & Publishing',
+        'FUND': 'Political Organization',
+        'ACTION': 'Political Organization',
+        'POLITICAL': 'Political Organization',
+        'STRATEGIES': 'Political Consulting',
+        'OUTREACH': 'Political Consulting',
+        'MESSAGE': 'Political Consulting',
+        'INNOVATIVE': 'Technology',
+        'WIRED': 'Technology',
+        'CLOUD': 'Technology',
+        'LLC': 'Professional Services',
+        'INC': 'Professional Services'
+    }
+    
+    # First try to find in LinkedIn companies
+    print("Checking LinkedIn companies...")
+    cursor.execute('''
+        SELECT industry 
+        FROM linkedin_companies 
+        WHERE LOWER(name) LIKE LOWER(?) 
+        AND industry IS NOT NULL 
+        LIMIT 1
+    ''', (f'%{company_name}%',))
+    
+    linkedin_industry = cursor.fetchone()
+    if linkedin_industry:
+        print(f"Found LinkedIn industry: {linkedin_industry[0]}")
+        return linkedin_industry[0]
+    
+    # If not found in LinkedIn, try to determine from company name
+    print("No LinkedIn match, checking keywords...")
+    company_name_upper = company_name.upper()
+    for keyword, industry in industry_keywords.items():
+        if keyword in company_name_upper:
+            print(f"Found matching keyword '{keyword}' -> {industry}")
+            return industry
+    
+    # Special cases
+    if 'SAZERAC' in company_name_upper:
+        print("Found special case: Sazerac -> Beverages & Alcohol")
+        return 'Beverages & Alcohol'
+    if 'SCHNEIDER' in company_name_upper:
+        print("Found special case: Schneider's -> Restaurant & Hospitality")
+        return 'Restaurant & Hospitality'
+    
+    print("No matches found, defaulting to Political Services")
+    return 'Political Services'  # Default for political companies
+
 def get_politician_corporate_connections(candidate_id, conn=None):
     """
     Get all corporate connections for a politician through LinkedIn companies
@@ -270,33 +333,7 @@ def get_politician_corporate_connections(candidate_id, conn=None):
         
         companies = []
         
-        # Get LinkedIn companies that might be connected through name matching
-        # This is a simple heuristic - in practice, you'd want more sophisticated matching
-        cursor.execute('''
-            SELECT DISTINCT lc.name, lc.industry, lc.size, lc.website, lc.city, 
-                   lc.state, lc.country_code, lc.relevance_score
-            FROM linkedin_companies lc
-            WHERE lc.relevance_score >= 7  -- High relevance companies only
-            ORDER BY lc.relevance_score DESC, lc.size_priority ASC
-            LIMIT 20
-        ''')
-        
-        for row in cursor.fetchall():
-            name, industry, size, website, city, state, country, relevance = row
-            
-            companies.append({
-                'name': name,
-                'type': 'LinkedIn Company',
-                'industry': industry,
-                'size': size,
-                'website': website,
-                'location': f"{city}, {state}" if city and state else None,
-                'country': country,
-                'relevance_score': relevance,
-                'connection_type': 'Industry Relevance'
-            })
-        
-        # Get corporate PACs connected to this politician
+        # First get all corporate PACs and their contributions
         cursor.execute('''
             SELECT DISTINCT c.connected_org_nm, c.cmte_nm, c.cmte_tp,
                    SUM(cfc.amount) as total_contributions
@@ -312,20 +349,107 @@ def get_politician_corporate_connections(candidate_id, conn=None):
             ORDER BY total_contributions DESC
         ''', (candidate_id, candidate_id, candidate_id))
         
-        for row in cursor.fetchall():
-            org_name, committee_name, committee_type, contributions = row
+        corporate_pacs = cursor.fetchall()
+        print(f"\nFound {len(corporate_pacs)} corporate PACs")
+        
+        # For each corporate PAC, try to find matching LinkedIn company
+        for org_name, committee_name, committee_type, contributions in corporate_pacs:
+            print(f"\nProcessing company: {org_name}")
+            
+            # Clean up organization name for better matching
+            clean_org_name = org_name.replace(' INC', '').replace(' INC.', '').replace(' LLC', '').replace(' CORP', '').replace(' CORPORATION', '')
+            first_word = clean_org_name.split()[0] if clean_org_name else ''
+            
+            # Try to find matching LinkedIn company
+            cursor.execute('''
+                SELECT lc.name, lc.industry, lc.size, lc.website, lc.city, 
+                       lc.state, lc.country_code, lc.relevance_score
+                FROM linkedin_companies lc
+                WHERE (
+                    LOWER(lc.name) LIKE LOWER(?) OR
+                    LOWER(?) LIKE LOWER(lc.name) OR
+                    LOWER(lc.name) LIKE LOWER(?) OR
+                    LOWER(?) LIKE LOWER(lc.name)
+                )
+                AND lc.industry IS NOT NULL
+                ORDER BY lc.relevance_score DESC NULLS LAST, lc.size_priority ASC
+                LIMIT 1
+            ''', (
+                f'%{clean_org_name}%',
+                clean_org_name,
+                f'%{first_word}%',
+                first_word
+            ))
+            
+            linkedin_match = cursor.fetchone()
+            
+            if linkedin_match:
+                print(f"Found LinkedIn match: {linkedin_match[0]} (Industry: {linkedin_match[1]})")
+                name, industry, size, website, city, state, country, relevance = linkedin_match
+                companies.append({
+                    'name': name,
+                    'type': 'Corporate PAC Sponsor',
+                    'industry': industry,
+                    'size': size or 'Unknown',
+                    'website': website,
+                    'location': f"{city}, {state}" if city and state else None,
+                    'country': country or 'US',
+                    'relevance_score': relevance,
+                    'connection_type': f'Via {committee_name} ({committee_type})',
+                    'total_contributions': contributions or 0
+                })
+            else:
+                print(f"No LinkedIn match, determining industry from name")
+                # Determine industry from company name
+                industry = get_industry_for_company(org_name, cursor)
+                print(f"Final determined industry: {industry}")
+                
+                companies.append({
+                    'name': org_name,
+                    'type': 'Corporate PAC Sponsor',
+                    'industry': industry,
+                    'size': 'Unknown',
+                    'website': None,
+                    'location': None,
+                    'country': 'US',
+                    'relevance_score': None,
+                    'connection_type': f'Via {committee_name} ({committee_type})',
+                    'total_contributions': contributions or 0
+                })
+        
+        # Add additional high-relevance LinkedIn companies
+        print("\nFetching additional high-relevance LinkedIn companies...")
+        cursor.execute('''
+            SELECT DISTINCT lc.name, lc.industry, lc.size, lc.website, lc.city, 
+                   lc.state, lc.country_code, lc.relevance_score
+            FROM linkedin_companies lc
+            WHERE lc.industry IS NOT NULL
+            AND NOT EXISTS (
+                SELECT 1 FROM committees c 
+                WHERE LOWER(c.connected_org_nm) LIKE LOWER(lc.name)
+                OR LOWER(lc.name) LIKE LOWER(c.connected_org_nm)
+            )
+            ORDER BY lc.relevance_score DESC NULLS LAST, lc.size_priority ASC
+            LIMIT 10
+        ''')
+        
+        additional_companies = cursor.fetchall()
+        print(f"Found {len(additional_companies)} additional high-relevance LinkedIn companies")
+        
+        for row in additional_companies:
+            name, industry, size, website, city, state, country, relevance = row
+            print(f"Adding LinkedIn company: {name} (Industry: {industry})")
             
             companies.append({
-                'name': org_name,
-                'type': 'Corporate PAC Sponsor',
-                'industry': 'Unknown',
-                'size': 'Unknown',
-                'website': None,
-                'location': None,
-                'country': 'US',
-                'relevance_score': None,
-                'connection_type': f'Via {committee_name} ({committee_type})',
-                'total_contributions': contributions or 0
+                'name': name,
+                'type': 'LinkedIn Company',
+                'industry': industry,
+                'size': size or 'Unknown',
+                'website': website,
+                'location': f"{city}, {state}" if city and state else None,
+                'country': country or 'US',
+                'relevance_score': relevance,
+                'connection_type': 'Industry Relevance'
             })
         
         if should_close:
@@ -606,11 +730,154 @@ def print_comprehensive_money_report(candidate_id, politician_name=None):
     print("✅ LinkedIn Company Database")
     print("✅ Corporate PAC Connections")
 
+def check_linkedin_companies_table(conn=None):
+    """
+    Check the LinkedIn companies table schema and content.
+    """
+    try:
+        should_close = conn is None
+        if conn is None:
+            conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check table schema
+        cursor.execute("PRAGMA table_info(linkedin_companies)")
+        schema = cursor.fetchall()
+        print("\nLinkedIn Companies Table Schema:")
+        for col in schema:
+            print(f"  {col[1]} ({col[2]})")
+        
+        # Check row count
+        cursor.execute("SELECT COUNT(*) FROM linkedin_companies")
+        count = cursor.fetchone()[0]
+        print(f"\nTotal LinkedIn companies: {count}")
+        
+        # Check sample data
+        cursor.execute("""
+            SELECT name, industry, size, relevance_score 
+            FROM linkedin_companies 
+            WHERE industry IS NOT NULL 
+            LIMIT 5
+        """)
+        sample = cursor.fetchall()
+        print("\nSample LinkedIn companies with industries:")
+        for row in sample:
+            print(f"  {row[0]} - Industry: {row[1]}, Size: {row[2]}, Relevance: {row[3]}")
+        
+        if should_close:
+            conn.close()
+            
+    except Exception as e:
+        print(f"Error checking LinkedIn companies table: {e}")
+        if should_close and conn:
+            conn.close()
+
+def inspect_database_structure(conn=None):
+    """
+    Perform a detailed inspection of the database structure and content.
+    """
+    try:
+        should_close = conn is None
+        if conn is None:
+            conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        print("\n=== DATABASE STRUCTURE INSPECTION ===")
+        
+        # Get list of all tables
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = cursor.fetchall()
+        print("\nTables in database:")
+        for table in tables:
+            print(f"  - {table[0]}")
+        
+        # Inspect linkedin_companies table
+        print("\n=== LINKEDIN_COMPANIES TABLE ===")
+        cursor.execute("PRAGMA table_info(linkedin_companies)")
+        schema = cursor.fetchall()
+        print("\nSchema:")
+        for col in schema:
+            print(f"  {col[1]} ({col[2]})")
+        
+        # Count total companies
+        cursor.execute("SELECT COUNT(*) FROM linkedin_companies")
+        total = cursor.fetchone()[0]
+        print(f"\nTotal companies: {total}")
+        
+        # Count companies with industry data
+        cursor.execute("SELECT COUNT(*) FROM linkedin_companies WHERE industry IS NOT NULL")
+        with_industry = cursor.fetchone()[0]
+        print(f"Companies with industry data: {with_industry}")
+        
+        # Get sample of companies with industry data
+        print("\nSample companies with industry data:")
+        cursor.execute("""
+            SELECT name, industry, size, relevance_score 
+            FROM linkedin_companies 
+            WHERE industry IS NOT NULL 
+            LIMIT 5
+        """)
+        sample = cursor.fetchall()
+        for row in sample:
+            print(f"  {row[0]}")
+            print(f"    Industry: {row[1]}")
+            print(f"    Size: {row[2]}")
+            print(f"    Relevance: {row[3]}")
+        
+        # Get unique industries
+        print("\nUnique industries in database:")
+        cursor.execute("""
+            SELECT DISTINCT industry 
+            FROM linkedin_companies 
+            WHERE industry IS NOT NULL 
+            ORDER BY industry
+        """)
+        industries = cursor.fetchall()
+        for industry in industries:
+            print(f"  - {industry[0]}")
+        
+        # Inspect committees table
+        print("\n=== COMMITTEES TABLE ===")
+        cursor.execute("PRAGMA table_info(committees)")
+        schema = cursor.fetchall()
+        print("\nSchema:")
+        for col in schema:
+            print(f"  {col[1]} ({col[2]})")
+        
+        # Get sample of corporate PACs
+        print("\nSample corporate PACs:")
+        cursor.execute("""
+            SELECT cmte_nm, connected_org_nm, cmte_tp, org_tp
+            FROM committees 
+            WHERE connected_org_nm IS NOT NULL 
+            LIMIT 5
+        """)
+        pacs = cursor.fetchall()
+        for pac in pacs:
+            print(f"  Committee: {pac[0]}")
+            print(f"    Connected Org: {pac[1]}")
+            print(f"    Type: {pac[2]}")
+            print(f"    Org Type: {pac[3]}")
+        
+        if should_close:
+            conn.close()
+            
+    except Exception as e:
+        print(f"Error inspecting database: {e}")
+        if should_close and conn:
+            conn.close()
+
 # Main execution for testing
 if __name__ == "__main__":
-    # Test with different politicians
-    #test_politicians = ['Barrasso', 'Warren', 'Cruz', 'Harris']
-    #test_politicians = ['Barrasso']
+    # First inspect the database structure
+    print("\nInspecting database structure...")
+    inspect_database_structure()
+    
+    # Then check LinkedIn companies specifically
+    print("\nChecking LinkedIn companies table...")
+    check_linkedin_companies_table()
+    
+    # Then run the normal test
     test_politicians = ['Barrasso']
     for politician in test_politicians:
         print(f"\n🔍 Searching for: {politician}")
@@ -618,12 +885,10 @@ if __name__ == "__main__":
         
         if candidate_id:
             print(f"✅ Found candidate ID: {candidate_id}")
-            # Don't pass politician name - let function get full name from database
             print_comprehensive_money_report(candidate_id)
-            break  # Just show one example
+            break
         else:
             print(f"❌ No candidate found for: {politician}")
     
     if not any(getCandidateIdByName(p) for p in test_politicians):
-        print("\n⚠️  No test politicians found.")
-        #print_comprehensive_money_report("S4SC00240", "Unknown Politician") 
+        print("\n⚠️  No test politicians found.") 

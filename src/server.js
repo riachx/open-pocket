@@ -1639,7 +1639,54 @@ app.get('/api/politician/:lastName/industries', async (req, res) => {
 
     if (corporateConnections && Array.isArray(corporateConnections)) {
       corporateConnections.forEach(connection => {
-        const industry = connection.industry || 'Other';
+        // Use the industry from the connection, or determine it from the company name
+        let industry = connection.industry;
+        
+        // If no industry is set, try to determine it from the company name
+        if (!industry || industry === 'Unknown' || industry === 'Other') {
+          // Common industry mappings
+          const industryKeywords = {
+            'DATA': 'Data & Analytics',
+            'SERVICES': 'Professional Services',
+            'CONSULTING': 'Professional Services',
+            'CONSULTANTS': 'Professional Services',
+            'MARKETING': 'Marketing & Advertising',
+            'CREATIVE': 'Marketing & Advertising',
+            'PRINTING': 'Printing & Publishing',
+            'MAIL': 'Printing & Publishing',
+            'FUND': 'Political Organization',
+            'ACTION': 'Political Organization',
+            'POLITICAL': 'Political Organization',
+            'STRATEGIES': 'Political Consulting',
+            'OUTREACH': 'Political Consulting',
+            'MESSAGE': 'Political Consulting',
+            'INNOVATIVE': 'Technology',
+            'WIRED': 'Technology',
+            'CLOUD': 'Technology',
+            'LLC': 'Professional Services',
+            'INC': 'Professional Services'
+          };
+
+          const companyName = connection.name.toUpperCase();
+          for (const [keyword, mappedIndustry] of Object.entries(industryKeywords)) {
+            if (companyName.includes(keyword)) {
+              industry = mappedIndustry;
+              break;
+            }
+          }
+
+          // Special cases
+          if (companyName.includes('SAZERAC')) {
+            industry = 'Beverages & Alcohol';
+          } else if (companyName.includes('SCHNEIDER')) {
+            industry = 'Restaurant & Hospitality';
+          }
+
+          // If still no industry found, use a default
+          if (!industry) {
+            industry = 'Political Services';
+          }
+        }
 
         if (!industryMap[industry]) {
           industryMap[industry] = {
@@ -1650,6 +1697,8 @@ app.get('/api/politician/:lastName/industries', async (req, res) => {
           };
         }
 
+        // Update the connection's industry
+        connection.industry = industry;
         industryMap[industry].companies.push(connection);
         industryMap[industry].totalContributions += connection.total_contributions || 0;
         industryMap[industry].connectionCount += 1;
@@ -1663,10 +1712,7 @@ app.get('/api/politician/:lastName/industries', async (req, res) => {
 
     res.json({
       industries: industries,
-      corporateConnections: corporateConnections,
-      politician: politician,
-      candidateId: candidateId,
-      searchedFor: { lastName, firstName: firstName || null }
+      corporateConnections: corporateConnections
     });
 
   } catch (error) {
@@ -1950,7 +1996,54 @@ app.get('/api/senator/:id/industries', async (req, res) => {
 
     if (corporateConnections && Array.isArray(corporateConnections)) {
       corporateConnections.forEach(connection => {
-        const industry = connection.industry || 'Other';
+        // Use the industry from the connection, or determine it from the company name
+        let industry = connection.industry;
+        
+        // If no industry is set, try to determine it from the company name
+        if (!industry || industry === 'Unknown' || industry === 'Other') {
+          // Common industry mappings
+          const industryKeywords = {
+            'DATA': 'Data & Analytics',
+            'SERVICES': 'Professional Services',
+            'CONSULTING': 'Professional Services',
+            'CONSULTANTS': 'Professional Services',
+            'MARKETING': 'Marketing & Advertising',
+            'CREATIVE': 'Marketing & Advertising',
+            'PRINTING': 'Printing & Publishing',
+            'MAIL': 'Printing & Publishing',
+            'FUND': 'Political Organization',
+            'ACTION': 'Political Organization',
+            'POLITICAL': 'Political Organization',
+            'STRATEGIES': 'Political Consulting',
+            'OUTREACH': 'Political Consulting',
+            'MESSAGE': 'Political Consulting',
+            'INNOVATIVE': 'Technology',
+            'WIRED': 'Technology',
+            'CLOUD': 'Technology',
+            'LLC': 'Professional Services',
+            'INC': 'Professional Services'
+          };
+
+          const companyName = connection.name.toUpperCase();
+          for (const [keyword, mappedIndustry] of Object.entries(industryKeywords)) {
+            if (companyName.includes(keyword)) {
+              industry = mappedIndustry;
+              break;
+            }
+          }
+
+          // Special cases
+          if (companyName.includes('SAZERAC')) {
+            industry = 'Beverages & Alcohol';
+          } else if (companyName.includes('SCHNEIDER')) {
+            industry = 'Restaurant & Hospitality';
+          }
+
+          // If still no industry found, use a default
+          if (!industry) {
+            industry = 'Political Services';
+          }
+        }
 
         if (!industryMap[industry]) {
           industryMap[industry] = {
@@ -1961,6 +2054,8 @@ app.get('/api/senator/:id/industries', async (req, res) => {
           };
         }
 
+        // Update the connection's industry
+        connection.industry = industry;
         industryMap[industry].companies.push(connection);
         industryMap[industry].totalContributions += connection.total_contributions || 0;
         industryMap[industry].connectionCount += 1;
@@ -1989,5 +2084,103 @@ app.get('/api/senator/:id/industries', async (req, res) => {
     }
   }
 });
+
+// Function to classify company industry based on keywords
+function classifyCompanyIndustry(companyName) {
+  const name = companyName.toUpperCase();
+  
+  // Define industry keywords and their mappings
+  const industryMappings = {
+    'POLITICAL': 'Political Consulting',
+    'STRATEGIES': 'Political Consulting',
+    'OUTREACH': 'Political Consulting',
+    'MESSAGE': 'Political Consulting',
+    'CONSULTING': 'Political Consulting',
+    'CONSULTANTS': 'Political Consulting',
+    'DATA': 'Data & Analytics',
+    'ANALYTICS': 'Data & Analytics',
+    'CLOUD': 'Technology',
+    'SOFTWARE': 'Technology',
+    'TECH': 'Technology',
+    'DIGITAL': 'Technology',
+    'MARKETING': 'Marketing & Advertising',
+    'ADVERTISING': 'Marketing & Advertising',
+    'CREATIVE': 'Marketing & Advertising',
+    'MEDIA': 'Marketing & Advertising',
+    'PRINTING': 'Printing & Publishing',
+    'MAIL': 'Printing & Publishing',
+    'PUBLISHING': 'Printing & Publishing',
+    'FUND': 'Political Organization',
+    'ACTION': 'Political Organization',
+    'COMMITTEE': 'Political Organization',
+    'PAC': 'Political Organization',
+    'LAW': 'Legal Services',
+    'ATTORNEY': 'Legal Services',
+    'LEGAL': 'Legal Services',
+    'HEALTH': 'Healthcare',
+    'MEDICAL': 'Healthcare',
+    'PHARMACEUTICAL': 'Healthcare',
+    'BANK': 'Financial Services',
+    'FINANCE': 'Financial Services',
+    'INVESTMENT': 'Financial Services',
+    'INSURANCE': 'Insurance',
+    'REAL ESTATE': 'Real Estate',
+    'PROPERTY': 'Real Estate',
+    'CONSTRUCTION': 'Construction',
+    'BUILDING': 'Construction',
+    'ENERGY': 'Energy',
+    'OIL': 'Energy',
+    'GAS': 'Energy',
+    'UTILITY': 'Utilities',
+    'ELECTRIC': 'Utilities',
+    'TELECOM': 'Telecommunications',
+    'COMMUNICATIONS': 'Telecommunications',
+    'RETAIL': 'Retail',
+    'STORE': 'Retail',
+    'RESTAURANT': 'Restaurant & Hospitality',
+    'HOTEL': 'Restaurant & Hospitality',
+    'HOSPITALITY': 'Restaurant & Hospitality',
+    'FOOD': 'Food & Beverage',
+    'BEVERAGE': 'Food & Beverage',
+    'ALCOHOL': 'Beverages & Alcohol',
+    'WINE': 'Beverages & Alcohol',
+    'BEER': 'Beverages & Alcohol',
+    'SPIRITS': 'Beverages & Alcohol',
+    'SAZERAC': 'Beverages & Alcohol',
+    'SCHNEIDER': 'Restaurant & Hospitality',
+    'TRANSPORTATION': 'Transportation',
+    'RAILROAD': 'Transportation',
+    'AIRLINE': 'Transportation',
+    'DEFENSE': 'Defense & Aerospace',
+    'AEROSPACE': 'Defense & Aerospace',
+    'MANUFACTURING': 'Manufacturing',
+    'INDUSTRIAL': 'Manufacturing',
+    'AGRICULTURE': 'Agriculture',
+    'FARMING': 'Agriculture',
+    'MINING': 'Mining & Natural Resources',
+    'NATURAL RESOURCES': 'Mining & Natural Resources',
+    'EDUCATION': 'Education',
+    'UNIVERSITY': 'Education',
+    'COLLEGE': 'Education',
+    'NONPROFIT': 'Non-Profit',
+    'FOUNDATION': 'Non-Profit',
+    'CHARITY': 'Non-Profit'
+  };
+
+  // Check for exact matches first
+  for (const [keyword, industry] of Object.entries(industryMappings)) {
+    if (name.includes(keyword)) {
+      return industry;
+    }
+  }
+
+  // Special case handling for common company types
+  if (name.includes('LLC') || name.includes('INC') || name.includes('CORP')) {
+    return 'Professional Services';
+  }
+
+  // Default category for unmatched companies
+  return 'Political Services';
+}
 
 

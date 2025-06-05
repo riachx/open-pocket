@@ -475,8 +475,225 @@ const Politician = () => {
     fetchCongressmanDetails();
   }, [id]);
 
+  // Add this function before the Politician component
+  const classifyIndustry = (companyName: string): string => {
+    const name = companyName.toUpperCase();
+    
+    // Political and Consulting
+    if (name.includes('POLITICAL') || name.includes('STRATEGIES') || 
+        name.includes('OUTREACH') || name.includes('MESSAGE') || 
+        name.includes('CONSULTING') || name.includes('CONSULTANTS')) {
+      return 'Political Consulting';
+    }
+    
+    // Data and Technology
+    if (name.includes('DATA') || name.includes('ANALYTICS') || 
+        name.includes('CLOUD') || name.includes('SOFTWARE') || 
+        name.includes('TECH') || name.includes('DIGITAL')) {
+      return 'Data & Technology';
+    }
+    
+    // Marketing and Media
+    if (name.includes('MARKETING') || name.includes('ADVERTISING') || 
+        name.includes('CREATIVE') || name.includes('MEDIA')) {
+      return 'Marketing & Media';
+    }
+    
+    // Printing and Publishing
+    if (name.includes('PRINTING') || name.includes('MAIL') || 
+        name.includes('PUBLISHING')) {
+      return 'Printing & Publishing';
+    }
+    
+    // Political Organizations
+    if (name.includes('FUND') || name.includes('ACTION') || 
+        name.includes('COMMITTEE') || name.includes('PAC')) {
+      return 'Political Organization';
+    }
+    
+    // Legal Services
+    if (name.includes('LAW') || name.includes('ATTORNEY') || 
+        name.includes('LEGAL')) {
+      return 'Legal Services';
+    }
+    
+    // Healthcare
+    if (name.includes('HEALTH') || name.includes('MEDICAL') || 
+        name.includes('PHARMACEUTICAL')) {
+      return 'Healthcare';
+    }
+    
+    // Financial Services
+    if (name.includes('BANK') || name.includes('FINANCE') || 
+        name.includes('INVESTMENT')) {
+      return 'Financial Services';
+    }
+    
+    // Insurance
+    if (name.includes('INSURANCE')) {
+      return 'Insurance';
+    }
+    
+    // Real Estate
+    if (name.includes('REAL ESTATE') || name.includes('PROPERTY')) {
+      return 'Real Estate';
+    }
+    
+    // Construction
+    if (name.includes('CONSTRUCTION') || name.includes('BUILDING')) {
+      return 'Construction';
+    }
+    
+    // Energy
+    if (name.includes('ENERGY') || name.includes('OIL') || 
+        name.includes('GAS')) {
+      return 'Energy';
+    }
+    
+    // Utilities
+    if (name.includes('UTILITY') || name.includes('ELECTRIC')) {
+      return 'Utilities';
+    }
+    
+    // Telecommunications
+    if (name.includes('TELECOM') || name.includes('COMMUNICATIONS')) {
+      return 'Telecommunications';
+    }
+    
+    // Retail
+    if (name.includes('RETAIL') || name.includes('STORE')) {
+      return 'Retail';
+    }
+    
+    // Restaurant and Hospitality
+    if (name.includes('RESTAURANT') || name.includes('HOTEL') || 
+        name.includes('HOSPITALITY') || name.includes('SCHNEIDER')) {
+      return 'Restaurant & Hospitality';
+    }
+    
+    // Food and Beverage
+    if (name.includes('FOOD') || name.includes('BEVERAGE')) {
+      return 'Food & Beverage';
+    }
+    
+    // Beverages and Alcohol
+    if (name.includes('ALCOHOL') || name.includes('WINE') || 
+        name.includes('BEER') || name.includes('SPIRITS') || 
+        name.includes('SAZERAC')) {
+      return 'Beverages & Alcohol';
+    }
+    
+    // Transportation
+    if (name.includes('TRANSPORTATION') || name.includes('RAILROAD') || 
+        name.includes('AIRLINE')) {
+      return 'Transportation';
+    }
+    
+    // Defense and Aerospace
+    if (name.includes('DEFENSE') || name.includes('AEROSPACE')) {
+      return 'Defense & Aerospace';
+    }
+    
+    // Manufacturing
+    if (name.includes('MANUFACTURING') || name.includes('INDUSTRIAL')) {
+      return 'Manufacturing';
+    }
+    
+    // Agriculture
+    if (name.includes('AGRICULTURE') || name.includes('FARMING')) {
+      return 'Agriculture';
+    }
+    
+    // Mining and Natural Resources
+    if (name.includes('MINING') || name.includes('NATURAL RESOURCES')) {
+      return 'Mining & Natural Resources';
+    }
+    
+    // Education
+    if (name.includes('EDUCATION') || name.includes('UNIVERSITY') || 
+        name.includes('COLLEGE')) {
+      return 'Education';
+    }
+    
+    // Non-Profit
+    if (name.includes('NONPROFIT') || name.includes('FOUNDATION') || 
+        name.includes('CHARITY')) {
+      return 'Non-Profit';
+    }
+    
+    // Professional Services (for companies with LLC, INC, CORP)
+    if (name.includes('LLC') || name.includes('INC') || name.includes('CORP')) {
+      return 'Professional Services';
+    }
+    
+    // Default category
+    return 'Political Services';
+  };
 
-
+  // Update the fetchIndustryData function
+  const fetchIndustryData = async () => {
+    if (!id) return;
+    
+    try {
+      setIsLoadingIndustries(true);
+      console.log('Fetching industry data for senator ID:', id);
+      
+      const response = await fetch(`http://localhost:3001/api/senator/${id}/industries`);
+      const data = await response.json();
+      
+      console.log('Received industry data:', data);
+      
+      // Create a map to group companies by industry
+      const industryMap = new Map<string, Industry>();
+      
+      // Process each company and classify its industry
+      data.corporateConnections?.forEach((company: any) => {
+        const industry = classifyIndustry(company.name);
+        
+        if (!industryMap.has(industry)) {
+          industryMap.set(industry, {
+            industry: industry,
+            companies: [],
+            totalContributions: 0,
+            connectionCount: 0
+          });
+        }
+        
+        const industryData = industryMap.get(industry)!;
+        industryData.companies.push({
+          name: company.name,
+          type: company.type || 'Corporate PAC Sponsor',
+          industry: industry,
+          size: company.size || 'Unknown',
+          website: company.website,
+          location: company.location,
+          country: company.country || 'US',
+          relevance_score: company.relevance_score,
+          connection_type: company.connection_type,
+          total_contributions: company.total_contributions || 0
+        });
+        industryData.totalContributions += company.total_contributions || 0;
+        industryData.connectionCount += 1;
+      });
+      
+      // Convert map to array and sort by total contributions
+      const industries = Array.from(industryMap.values())
+        .sort((a, b) => b.totalContributions - a.totalContributions);
+      
+      const transformedData = {
+        industries: industries,
+        corporateConnections: data.corporateConnections || []
+      };
+      
+      console.log('Transformed industry data:', transformedData);
+      setIndustryData(transformedData);
+    } catch (err) {
+      console.error('Error fetching industry data:', err);
+      setIndustriesError(err instanceof Error ? err.message : 'Failed to fetch industry data');
+    } finally {
+      setIsLoadingIndustries(false);
+    }
+  };
 
   // Fetch committee contributions using new money tracking endpoint
   useEffect(() => {
@@ -532,12 +749,49 @@ const Politician = () => {
         
         console.log('Received industry data:', data);
         
-        // Transform the data to match our frontend structure
+        // Create a map to group companies by industry
+        const industryMap = new Map<string, Industry>();
+        
+        // Process each company and classify its industry
+        data.corporateConnections?.forEach((company: any) => {
+          const industry = classifyIndustry(company.name);
+          
+          if (!industryMap.has(industry)) {
+            industryMap.set(industry, {
+              industry: industry,
+              companies: [],
+              totalContributions: 0,
+              connectionCount: 0
+            });
+          }
+          
+          const industryData = industryMap.get(industry)!;
+          industryData.companies.push({
+            name: company.name,
+            type: company.type || 'Corporate PAC Sponsor',
+            industry: industry,
+            size: company.size || 'Unknown',
+            website: company.website,
+            location: company.location,
+            country: company.country || 'US',
+            relevance_score: company.relevance_score,
+            connection_type: company.connection_type,
+            total_contributions: company.total_contributions || 0
+          });
+          industryData.totalContributions += company.total_contributions || 0;
+          industryData.connectionCount += 1;
+        });
+        
+        // Convert map to array and sort by total contributions
+        const industries = Array.from(industryMap.values())
+          .sort((a, b) => b.totalContributions - a.totalContributions);
+        
         const transformedData = {
-          industries: data.industries || [],
+          industries: industries,
           corporateConnections: data.corporateConnections || []
         };
         
+        console.log('Transformed industry data:', transformedData);
         setIndustryData(transformedData);
       } catch (err) {
         console.error('Error fetching industry data:', err);
