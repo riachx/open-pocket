@@ -2,6 +2,8 @@
 
 A React + TypeScript app with a Node/Express + SQLite backend that helps you explore U.S. politicians’ committees, corporate connections, and recent votes. It aggregates FEC committee data, corporate PAC links, and industry connections and presents them with a clean UI powered by Chakra UI.
 
+## Watch the Video here:
+
 [![Watch the video](https://img.youtube.com/vi/99JXE8DeNJA/hqdefault.jpg)](https://youtu.be/99JXE8DeNJA)
 
 ## Inspiration
