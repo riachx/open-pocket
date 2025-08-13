@@ -2,6 +2,8 @@
 
 A React + TypeScript app with a Node/Express + SQLite backend that helps you explore U.S. politicians’ committees, corporate connections, and recent votes. It aggregates FEC committee data, corporate PAC links, and industry connections and presents them with a clean UI powered by Chakra UI.
 
+[![Watch the video](https://img.youtube.com/vi/99JXE8DeNJA/maxresdefault.jpg)](https://youtu.be/99JXE8DeNJA)
+
 ## Inspiration
 
 The United States is in a politically complex and pivotal moment. We wanted to make a meaningful impact by helping people better understand the flow of money in politics. Super PACs and PACs wield significant influence, often shaping outcomes behind the scenes. Open Pocket aims to surface those financial relationships in a transparent and navigable way. R
